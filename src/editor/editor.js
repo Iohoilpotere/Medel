@@ -4,6 +4,8 @@ import CaseExporter from './exporter.js';
 import StepManager from '../steps/step-manager.js';
 import CommandManager from '../commands/command-manager.js';
 import { AddElementCommand, DeleteElementsCommand, MoveElementsCommand, ChangePropertyCommand } from '../commands/element-commands.js';
+import CommandManager from '../commands/command-manager.js';
+import { AddElementCommand, DeleteElementsCommand, MoveElementsCommand, ChangePropertyCommand } from '../commands/element-commands.js';
 import LabelElement from '../elements/LabelElement.js';
 import ImageElement from '../elements/ImageElement.js';
 import TextBoxElement from '../elements/TextBoxElement.js';
@@ -21,6 +23,7 @@ export default class Editor{
     this.stepMgr=new StepManager(this);
     this.panelMgr=new PanelManager();
     this.caseExporter = new CaseExporter(this);
+    this.commandMgr = new CommandManager(this);
     this.commandMgr = new CommandManager(this);
     window.__editor__ = this;
   }
@@ -62,6 +65,22 @@ export default class Editor{
     $('#btnUndo').addEventListener('click', () => this.commandMgr.undo());
     $('#btnRedo').addEventListener('click', () => this.commandMgr.redo());
     
+    
+    // Add undo/redo buttons to toolbar
+    const undoRedoGroup = document.createElement('div');
+    undoRedoGroup.className = 'btn-group btn-group-sm me-2';
+    undoRedoGroup.innerHTML = `
+      <button id="btnUndo" type="button" class="btn btn-outline-light" title="Annulla (Ctrl+Z)" disabled>↶</button>
+      <button id="btnRedo" type="button" class="btn btn-outline-light" title="Ripeti (Ctrl+Y)" disabled>↷</button>
+    `;
+    
+    // Insert after the align buttons
+    const alignGroup = document.querySelector('.btn-group[aria-label="Align"]');
+    alignGroup.parentNode.insertBefore(undoRedoGroup, alignGroup.nextSibling);
+    
+    $('#btnUndo').addEventListener('click', () => this.commandMgr.undo());
+    $('#btnRedo').addEventListener('click', () => this.commandMgr.redo());
+    
     this.stageEl.addEventListener('dragover', (e)=>{ e.preventDefault(); });
     this.stageEl.addEventListener('drop', (e)=>{ e.preventDefault(); const type=e.dataTransfer.getData('text/plain'); const el=this.createElementByType(type); if(!el) return; const p=clientToStage(e,this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth)/2, this.stageEl.clientWidth),0,100-el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight)/2, this.stageEl.clientHeight),0,100-el.h); const cmd = new AddElementCommand(this, el, `Aggiungi ${type}`); this.commandMgr.executeCommand(cmd); });
     this.stageEl.addEventListener('mousedown', (e)=>{ if(e.target===this.stageEl || e.target===this.canvas || e.target.classList.contains('stage-size')){ if(!e.shiftKey&&!e.ctrlKey) this.clearSelection();
@@ -77,6 +96,11 @@ export default class Editor{
   }
   initKeyboard(){
     window.addEventListener('keydown',(e)=>{
+      // Skip if command manager handles it (Ctrl+Z, etc.)
+      if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
+        return; // Let CommandManager handle these
+      }
+      
       // Skip if command manager handles it (Ctrl+Z, etc.)
       if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
         return; // Let CommandManager handle these
@@ -100,6 +124,33 @@ export default class Editor{
   onElementChanged(){ if(!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce=setTimeout(()=> this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
   nudge(dx,dy,opts={snap:false}){
     if (!this.selected.length) return;
+    
+    const grid=this.gridPct();
+    
+    // Calculate final positions with constraints
+    const finalDx = dx, finalDy = dy;
+    let canMove = true;
+    
+    // Check if all elements can move to new positions
+    this.selected.forEach(el => {
+      let nx = el.x + finalDx, ny = el.y + finalDy;
+      if (opts.snap) {
+        nx = snapTo(nx, grid.x);
+        ny = snapTo(ny, grid.y);
+      }
+      nx = Math.max(0, Math.min(100 - el.w, nx));
+      ny = Math.max(0, Math.min(100 - el.h, ny));
+      
+      // If position would be clamped, adjust the delta
+      if (Math.abs(nx - (el.x + finalDx)) > 0.01 || Math.abs(ny - (el.y + finalDy)) > 0.01) {
+        canMove = false;
+      }
+    });
+    
+    if (canMove) {
+      const cmd = new MoveElementsCommand(this, this.selected, finalDx, finalDy, 'Sposta elementi');
+      this.commandMgr.executeCommand(cmd);
+    }
     
     const grid=this.gridPct();
     
@@ -151,6 +202,11 @@ export default class Editor{
     const cmd = new DeleteElementsCommand(this, this.selected, 'Elimina elementi');
     this.commandMgr.executeCommand(cmd);
   }
+  deleteSelectedWithCommand(){ 
+    if (!this.selected.length) return;
+    const cmd = new DeleteElementsCommand(this, this.selected, 'Elimina elementi');
+    this.commandMgr.executeCommand(cmd);
+  }
   renderPropPanel(){ const f=this.propForm; f.innerHTML='';
     if(!this.selected.length){
       const step=this.stepMgr?.activeStep; if(!step){ f.innerHTML='<div class="text-secondary small">Nessuno step attivo</div>'; return; }
@@ -176,6 +232,11 @@ export default class Editor{
       else{ input=document.createElement('input'); input.type=def.type||'text'; input.className='form-control form-control-sm'; if(def.min!=null) input.min=def.min; }
       input.id=id; input.dataset.prop=def.key; let v=el[def.key]; if(def.key==='options') v=el.options.join(';'); if(def.type!=='checkbox') input.value = v ?? '';
       input.addEventListener('input', ()=>{ 
+        const oldVal = el[def.key];
+        let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); 
+        const cmd = new ChangePropertyCommand(this, el, def.key, val, oldVal, `Modifica ${def.label.toLowerCase()}`);
+        this.commandMgr.executeCommand(cmd);
+      });
         const oldVal = el[def.key];
         let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); 
         const cmd = new ChangePropertyCommand(this, el, def.key, val, oldVal, `Modifica ${def.label.toLowerCase()}`);

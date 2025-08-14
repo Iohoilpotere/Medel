@@ -1,6 +1,7 @@
 import { $, $$, clamp, snapTo, pxToPct, pctToPx, clientToStage } from './utils.js';
 import Editor from '../editor/editor.js';
 import { MoveElementsCommand, ResizeElementsCommand } from '../commands/element-commands.js';
+import { MoveElementsCommand, ResizeElementsCommand } from '../commands/element-commands.js';
 
 export default class BaseElement {
   constructor(type, x=10, y=10, w=20, h=10){
@@ -48,6 +49,27 @@ export default class BaseElement {
           Editor.instance.commandMgr.executeCommand(cmd);
         }
       };
+        hasMoved = true;
+      };
+      const onUp=()=>{ 
+        window.removeEventListener('mousemove', onMove); 
+        window.removeEventListener('mouseup', onUp);
+        
+        if (hasMoved) {
+          // Create command for the completed move
+          const finalDx = this.x - sx;
+          const finalDy = this.y - sy;
+          
+          // Reset to original position
+          this.x = sx;
+          this.y = sy;
+          this.applyTransform();
+          
+          // Execute command
+          const cmd = new MoveElementsCommand(Editor.instance, Editor.instance.selected, finalDx, finalDy, 'Sposta elementi');
+          Editor.instance.commandMgr.executeCommand(cmd);
+        }
+      };
       window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
     });
     this.dom.addEventListener('mousedown',(e)=>{
@@ -56,8 +78,11 @@ export default class BaseElement {
       const dir=h.dataset.dir; const stage=Editor.instance.stageEl; const start=clientToStage(e, stage);
       const sx=this.x, sy=this.y, sw=this.w, sh=this.h; const aspect=sw/sh; const grid=Editor.instance.gridPct();
       let hasResized = false;
+      const sx=this.x, sy=this.y, sw=this.w, sh=this.h; const aspect=sw/sh; const grid=Editor.instance.gridPct();
+      let hasResized = false;
       
       const onMove=(ev)=>{
+        hasResized = true;
         hasResized = true;
         const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
         let nx=sx, ny=sy, nw=sw, nh=sh;
@@ -72,6 +97,22 @@ export default class BaseElement {
         nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); nw = snapTo(nw, grid.x); nh = snapTo(nh, grid.y);
         Object.assign(this,{x:nx,y:ny,w:nw,h:nh}); this.applyTransform(); Editor.instance.reflectSelection(); };
       const onUp=()=>{ 
+        window.removeEventListener('mousemove', onMove); 
+        window.removeEventListener('mouseup', onUp);
+        
+        if (hasResized) {
+          // Create command for the completed resize
+          const newBounds = [{ x: this.x, y: this.y, w: this.w, h: this.h }];
+          
+          // Reset to original bounds
+          Object.assign(this, { x: sx, y: sy, w: sw, h: sh });
+          this.applyTransform();
+          
+          // Execute command
+          const cmd = new ResizeElementsCommand(Editor.instance, [this], newBounds, 'Ridimensiona elemento');
+          Editor.instance.commandMgr.executeCommand(cmd);
+        }
+      };
         window.removeEventListener('mousemove', onMove); 
         window.removeEventListener('mouseup', onUp);
         
