@@ -2,29 +2,29 @@
 import { $, $$ } from '../core/utils.js';
 
 export default class CaseExporter {
-  constructor(editor){
+  constructor(editor) {
     this.ed = editor;
   }
 
-  async exportCaseHTML(){
+  async exportCaseHTML() {
     const cats = this.ed.stepMgr.categories;
     // 1) Raccogli asset (bg step + <img> di ogni step)
     const urlSet = new Set();
-    for (const cat of cats){
-      for (const step of cat.steps){
+    for (const cat of cats) {
+      for (const step of cat.steps) {
         if (step.bgUrl) urlSet.add(step.bgUrl);
-        for (const el of step.items){
+        for (const el of step.items) {
           if (el.type === 'image' && el.src) urlSet.add(el.src);
         }
       }
     }
     // 2) Converte in data URL (best effort: se fallisce, resta l’URL originale)
     const urlMap = {};
-    await Promise.all([...urlSet].map(async (u)=>{
-      try{
+    await Promise.all([...urlSet].map(async (u) => {
+      try {
         const dataUrl = await this.toDataURL(u);
         urlMap[u] = dataUrl;
-      }catch(e){
+      } catch (e) {
         console.warn('Embed fallito (uso URL originale):', u, e);
         urlMap[u] = u;
       }
@@ -32,45 +32,45 @@ export default class CaseExporter {
 
     // 3) Costruisci markup per ogni step
     const stepSections = [];
-    for (const cat of cats){
-      for (const step of cat.steps){
+    for (const cat of cats) {
+      for (const step of cat.steps) {
         stepSections.push(this.serializeStep(step, urlMap));
       }
     }
 
     // 4) Documento completo (CSS+JS inline) + download
     const html = this.buildDocument(cats, stepSections.join('\n'));
-    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'caso-clinico.html';
     a.click();
-    setTimeout(()=>URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   // -- util
 
-  async toDataURL(url){
-    const res = await fetch(url, {mode:'cors'}); // se CORS blocca, andrà in catch
+  async toDataURL(url) {
+    const res = await fetch(url, { mode: 'cors' }); // se CORS blocca, andrà in catch
     const blob = await res.blob();
-    return await new Promise((resolve, reject)=>{
+    return await new Promise((resolve, reject) => {
       const fr = new FileReader();
       fr.onerror = reject;
-      fr.onload = ()=> resolve(fr.result);
+      fr.onload = () => resolve(fr.result);
       fr.readAsDataURL(blob);
     });
   }
 
   // serializza UNO step in HTML (stesso layout/stile dell’editor)
-  serializeStep(step, urlMap){
+  serializeStep(step, urlMap) {
     const bg = step.bgUrl ? (urlMap[step.bgUrl] || step.bgUrl) : '';
     // canvas dello step
-    const canvasInner = step.items.map(el=>{
-      const baseStyle = `left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;z-index:${Math.max(0, el.z|0)};position:absolute;`;
-      switch(el.type){
+    const canvasInner = step.items.map(el => {
+      const baseStyle = `left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;z-index:${Math.max(0, el.z | 0)};position:absolute;`;
+      switch (el.type) {
         case 'label': {
-          const justify = el.align==='left' ? 'flex-start' : el.align==='center' ? 'center' : 'flex-end';
+          const justify = el.align === 'left' ? 'flex-start' : el.align === 'center' ? 'center' : 'flex-end';
           return `<div class="el el-label p-2" style="${baseStyle}color:${el.color};font-size:${el.fontSize}vw;">
                     <div class="content w-100 h-100 d-flex align-items-center" style="justify-content:${justify}">${this.escape(el.text)}</div>
                   </div>`;
@@ -78,16 +78,16 @@ export default class CaseExporter {
         case 'image': {
           const src = el.src ? (urlMap[el.src] || el.src) : '';
           return `<div class="el el-image" style="${baseStyle}">
-                    <img class="w-100 h-100" alt="${this.escape(el.alt||'')}" style="object-fit:${el.fit||'cover'}" src="${src}">
+                    <img class="w-100 h-100" alt="${this.escape(el.alt || '')}" style="object-fit:${el.fit || 'cover'}" src="${src}">
                   </div>`;
         }
         case 'textbox': {
           // Di default mantengo gli input interattivi; dimmi se li vuoi in sola lettura.
           return `<div class="el el-textbox p-2" style="${baseStyle}">
                     <input class="form-control form-control-sm h-100" type="text"
-                           name="${this.escape(el.name||'')}"
-                           placeholder="${this.escape(el.placeholder||'')}"
-                           style="text-align:${el.align||'left'}" />
+                           name="${this.escape(el.name || '')}"
+                           placeholder="${this.escape(el.placeholder || '')}"
+                           style="text-align:${el.align || 'left'}" />
                   </div>`;
         }
         case 'checkbox': {
@@ -95,17 +95,17 @@ export default class CaseExporter {
           const id = `${step.id}-${el.id}-in`;
           return `<div class="el el-checkbox" style="${baseStyle}">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" id="${id}" name="${this.escape(el.name||'')}" ${checked}>
-                      <label class="form-check-label" for="${id}">${this.escape(el.label||'')}</label>
+                      <input class="form-check-input" type="checkbox" id="${id}" name="${this.escape(el.name || '')}" ${checked}>
+                      <label class="form-check-label" for="${id}">${this.escape(el.label || '')}</label>
                     </div>
                   </div>`;
         }
         case 'radiogroup': {
-          const opts = (el.options||[]).map((opt,i)=>{
+          const opts = (el.options || []).map((opt, i) => {
             const id = `${step.id}-${el.id}-r${i}`;
             const klass = el.inline ? 'form-check form-check-inline' : 'form-check';
             return `<div class="${klass}">
-                      <input class="form-check-input" type="radio" name="${this.escape(el.name||'opt')}" id="${id}" value="${this.escape(opt)}">
+                      <input class="form-check-input" type="radio" name="${this.escape(el.name || 'opt')}" id="${id}" value="${this.escape(opt)}">
                       <label class="form-check-label" for="${id}">${this.escape(opt)}</label>
                     </div>`;
           }).join('');
@@ -116,9 +116,9 @@ export default class CaseExporter {
     }).join('\n');
 
     return `
-<section class="step" data-step-id="${step.id}" data-orient="${step.orient==='portrait'?'portrait':'landscape'}" style="display:none;">
+<section class="step" data-step-id="${step.id}" data-orient="${step.orient === 'portrait' ? 'portrait' : 'landscape'}" style="display:none;">
   <div class="stage-outer">
-    <div class="stage" data-orient="${step.orient==='portrait'?'portrait':'landscape'}">
+    <div class="stage" data-orient="${step.orient === 'portrait' ? 'portrait' : 'landscape'}">
       <div class="stage-size">
         <div class="step-canvas" style="${bg ? `background: center/cover no-repeat url('${bg}')` : ''}">
           ${canvasInner}
@@ -129,14 +129,14 @@ export default class CaseExporter {
 </section>`;
   }
 
-  escape(s){ return (s??'').toString().replace(/[&<>"]/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[m] )); }
+  escape(s) { return (s ?? '').toString().replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
 
   // documento finale
-  buildDocument(categories, sectionsHtml){
-    const catsHtml = categories.map(cat=>{
-      const steps = cat.steps.map((s, i)=>`
+  buildDocument(categories, sectionsHtml) {
+    const catsHtml = categories.map(cat => {
+      const steps = cat.steps.map((s, i) => `
         <button class="nav-step" data-goto="${s.id}" title="${this.escape(s.name)}">
-          <span class="num">${i+1}</span><span class="nm">${this.escape(s.name)}</span>
+          <span class="num">${i + 1}</span><span class="nm">${this.escape(s.name)}</span>
         </button>`).join('');
       return `
       <div class="nav-cat" data-cat="${cat.id}">

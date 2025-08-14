@@ -10,7 +10,7 @@ export default class CommandManager {
     this.currentIndex = -1;
     this.maxHistorySize = 100;
     this.mergingTimeWindow = 500; // ms - commands within this window can be merged
-    
+
     this.initKeyboardShortcuts();
   }
 
@@ -21,7 +21,7 @@ export default class CommandManager {
     try {
       // Execute the command
       command.execute();
-      
+
       // Try to merge with the last command if possible
       if (this.canMergeWithLast(command)) {
         const lastCommand = this.history[this.currentIndex];
@@ -30,20 +30,20 @@ export default class CommandManager {
       } else {
         // Remove any commands after current index (when undoing then doing new action)
         this.history = this.history.slice(0, this.currentIndex + 1);
-        
+
         // Add new command
         this.history.push(command);
         this.currentIndex++;
-        
+
         // Limit history size
         if (this.history.length > this.maxHistorySize) {
           this.history.shift();
           this.currentIndex--;
         }
       }
-      
+
       this.updateUI();
-      
+
     } catch (error) {
       console.error('Failed to execute command:', error);
       throw error;
@@ -55,7 +55,7 @@ export default class CommandManager {
    */
   undo() {
     if (!this.canUndo()) return false;
-    
+
     try {
       const command = this.history[this.currentIndex];
       command.undo();
@@ -73,7 +73,7 @@ export default class CommandManager {
    */
   redo() {
     if (!this.canRedo()) return false;
-    
+
     try {
       this.currentIndex++;
       const command = this.history[this.currentIndex];
@@ -106,10 +106,10 @@ export default class CommandManager {
    */
   canMergeWithLast(command) {
     if (this.currentIndex < 0) return false;
-    
+
     const lastCommand = this.history[this.currentIndex];
     const timeDiff = command.timestamp - lastCommand.timestamp;
-    
+
     return timeDiff <= this.mergingTimeWindow && lastCommand.canMergeWith(command);
   }
 
@@ -152,13 +152,13 @@ export default class CommandManager {
         e.preventDefault();
         this.undo();
       }
-      
+
       // Ctrl+Shift+Z or Cmd+Shift+Z for redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
         this.redo();
       }
-      
+
       // Ctrl+Y or Cmd+Y for redo (alternative)
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
@@ -174,13 +174,13 @@ export default class CommandManager {
     // Update toolbar buttons if they exist
     const undoBtn = $('#btnUndo');
     const redoBtn = $('#btnRedo');
-    
+
     if (undoBtn) {
       undoBtn.disabled = !this.canUndo();
       const undoDesc = this.getCurrentCommandDescription();
       undoBtn.title = undoDesc ? `Annulla: ${undoDesc}` : 'Annulla';
     }
-    
+
     if (redoBtn) {
       redoBtn.disabled = !this.canRedo();
       const redoDesc = this.getNextCommandDescription();

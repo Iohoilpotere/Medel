@@ -1,122 +1,469 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Medel – Editor Step (Prototype v2.6.1, modular)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root{
-      --canvas-bg:#0b0c10; --grid-color:rgba(255,255,255,.12); --grid-color-sub:rgba(255,255,255,.06);
-      --sel:#0d6efd; --handle:#fff; --handle-size:10px;
-      --panel-gap:8px;
-      --thumb-bg:#13151a; --thumb-border:rgba(255,255,255,.14);
-      --thumb-h:76px;
-      --collapsed-h:48px;
+    :root {
+      --canvas-bg: #0b0c10;
+      --grid-color: rgba(255, 255, 255, .12);
+      --grid-color-sub: rgba(255, 255, 255, .06);
+      --sel: #0d6efd;
+      --handle: #fff;
+      --handle-size: 10px;
+      --panel-gap: 8px;
+      --thumb-bg: #13151a;
+      --thumb-border: rgba(255, 255, 255, .14);
+      --thumb-h: 76px;
+      --collapsed-h: 48px;
     }
-    html,body{height:100%;}
-    body{background:#0e0f13;color:#e9ecef;}
 
-    .left-col{display:flex; flex-direction:column; gap:var(--panel-gap); height:100%;}
-    .left-col > .dock-panel{flex:1 1 auto; min-height:0;}
-    .left-col > .dock-panel[data-collapsed="1"]{flex:0 0 var(--collapsed-h);}
-
-    .dock-panel{position:relative; display:flex; flex-direction:column; --panel-expanded-w:260px; --panel-collapsed-w:44px; width:var(--panel-expanded-w); transition:width .2s ease; background:#21252b; border:1px solid rgba(255,255,255,.12); border-radius:.5rem; overflow:visible;}
-    .dock-panel[data-collapsed="1"]{background:transparent; border-color:transparent; box-shadow:none;}
-    .sidebar{--panel-expanded-w:260px;}
-    .propbar{--panel-expanded-w:320px;}
-    .dock-panel[data-collapsed="1"]{width:var(--panel-collapsed-w);} 
-    .dock-panel .panel-body{flex:1; overflow:auto;}
-    .dock-panel[data-collapsed="1"] .panel-body{display:none;}
-
-    .dock-panel .panel-handle{
-      position:absolute; top:50%; transform:translate(0,-50%);
-      padding:.15rem .35rem; background:#1c1f24; color:#e9ecef;
-      border:1px solid rgba(255,255,255,.15); z-index:10; cursor:pointer;
-      border-radius:.375rem; opacity:.9;
+    html,
+    body {
+      height: 100%;
     }
-    .dock-panel[data-side="left"]  .panel-handle{right:-1px; transform:translate(100%,-50%); border-top-left-radius:0;  border-bottom-left-radius:0;}
-    .dock-panel[data-side="right"] .panel-handle{left:-1px;  transform:translate(-100%,-50%); border-top-right-radius:0; border-bottom-right-radius:0;}
-    .dock-panel[data-side="left"][data-collapsed="0"]  .panel-handle{ right:-1px; transform:translate(100%,-50%);}
-    .dock-panel[data-side="right"][data-collapsed="0"] .panel-handle{ left:-1px; transform:translate(-100%,-50%);}
 
-    .dock-panel .panel-handle .label{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:.02em; font-size:.7rem; line-height:1; }
+    body {
+      background: #0e0f13;
+      color: #e9ecef;
+    }
 
-    .toolbar{gap:.5rem}
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--panel-gap);
+      height: 100%;
+    }
 
-    .stage-wrap{flex:1;min-width:0;}
-    .stage-outer{position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+    .left-col>.dock-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
 
-    .stage{position:relative; background:var(--canvas-bg); border-radius:10px; box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 12px 30px rgba(0,0,0,.35); overflow:hidden; width:auto; height:auto;}
-    .stage[data-orient="landscape"]{aspect-ratio:16/9;}
-    .stage[data-orient="portrait"]{aspect-ratio:9/16;}
+    .left-col>.dock-panel[data-collapsed="1"] {
+      flex: 0 0 var(--collapsed-h);
+    }
 
-    .stage-size{position:relative; width:100%; height:100%;}
+    .dock-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      --panel-expanded-w: 260px;
+      --panel-collapsed-w: 44px;
+      width: var(--panel-expanded-w);
+      transition: width .2s ease;
+      background: #21252b;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: .5rem;
+      overflow: visible;
+    }
 
-    .stage[data-grid="on"] .stage-size::before{content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: var(--grid) var(--grid), var(--grid) var(--grid);}    
-    .stage[data-grid="on"][data-subgrid="on"] .stage-size::after{content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(var(--grid-color-sub) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color-sub) 1px, transparent 1px); background-size: calc(var(--grid)/2) calc(var(--grid)/2), calc(var(--grid)/2) calc(var(--grid)/2);}    
+    .dock-panel[data-collapsed="1"] {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
 
-    #stepCanvas{position:absolute; inset:0;}
+    .sidebar {
+      --panel-expanded-w: 260px;
+    }
 
-    .el{position:absolute; user-select:none;}
-    .el.selected{outline:2px solid var(--sel);}    
-    .marquee{position:absolute;border:1px dashed rgba(13,110,253,.7);background:rgba(13,110,253,.1);pointer-events:none;}
+    .propbar {
+      --panel-expanded-w: 320px;
+    }
 
-    .handles{position:absolute; inset:0; pointer-events:none;}
-    .handle{position:absolute; width:var(--handle-size); height:var(--handle-size); background:var(--handle); border:2px solid var(--sel); border-radius:3px; box-shadow:0 1px 2px rgba(0,0,0,.4); pointer-events:auto;}
-    .handle.nw{top:-6px; left:-6px; cursor:nwse-resize;} .handle.n{top:-6px; left:calc(50% - 6px); cursor:ns-resize;} .handle.ne{top:-6px; right:-6px; cursor:nesw-resize;}
-    .handle.e{top:calc(50% - 6px); right:-6px; cursor:ew-resize;} .handle.se{bottom:-6px; right:-6px; cursor:nwse-resize;} .handle.s{bottom:-6px; left:calc(50% - 6px); cursor:ns-resize;}
-    .handle.sw{bottom:-6px; left:-6px; cursor:nesw-resize;} .handle.w{top:calc(50% - 6px); left:-6px; cursor:ew-resize;}
+    .dock-panel[data-collapsed="1"] {
+      width: var(--panel-collapsed-w);
+    }
 
-    .palette-item{cursor:grab;} .palette-item:active{cursor:grabbing;}
-    .code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .dock-panel .panel-body {
+      flex: 1;
+      overflow: auto;
+    }
 
-    .steps-toolbar{display:flex; align-items:center; gap:.5rem;}
-    .steps-toolbar .btn{padding:.15rem .4rem;}
-    .cat{border-top:1px dashed rgba(255,255,255,.15); padding-top:.5rem; margin-top:.5rem;}
-    .cat:first-child{border-top:none; padding-top:0; margin-top:0;}
-    .cat-head{display:flex; align-items:center; justify-content:space-between; gap:.5rem;}
-    .cat-title{font-weight:600; font-size:.9rem;}
-    .cat-actions .btn{padding:.1rem .35rem;}
-    .cat-body{margin-top:.35rem;}
-    .thumbs{display:grid; grid-template-columns:1fr; gap:.5rem;}
+    .dock-panel[data-collapsed="1"] .panel-body {
+      display: none;
+    }
 
-    .thumb{position:relative; background:var(--thumb-bg); border:1px solid var(--thumb-border); border-radius:.4rem; overflow:hidden; cursor:pointer;}
-    .thumb .mini{position:relative; height:var(--thumb-h); width:calc(var(--thumb-h) * 16 / 9); background:#0b0c10; margin:0 auto;}
-    .thumb[data-orient="portrait"] .mini{width:calc(var(--thumb-h) * 9 / 16); height:var(--thumb-h);}    
-    .thumb .mini .mini-canvas{position:absolute; inset:0;}
-    .thumb .label{font-size:.75rem; padding:.35rem .5rem; color:#cbd3da; border-top:1px solid var(--thumb-border); display:flex; align-items:center; justify-content:space-between; gap:.5rem;}
-    .thumb .label .title{display:flex; align-items:center; gap:.4rem;}
-    .thumb .label .title .badge{font-weight:600;}
-    .thumb .actions{display:flex; gap:.3rem;}
-    .thumb .actions .btn-icon{border:1px solid var(--thumb-border); background:transparent; color:#cbd3da; padding:.15rem .3rem; border-radius:.35rem; line-height:1;}
-    .thumb .actions .btn-icon:hover{background:rgba(255,255,255,.06);}    
-    .thumb.active{outline:2px solid var(--sel);}
+    .dock-panel .panel-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(0, -50%);
+      padding: .15rem .35rem;
+      background: #1c1f24;
+      color: #e9ecef;
+      border: 1px solid rgba(255, 255, 255, .15);
+      z-index: 10;
+      cursor: pointer;
+      border-radius: .375rem;
+      opacity: .9;
+    }
 
-    .thumb.add .mini{display:flex; align-items:center; justify-content:center;}
-    .thumb.add .mini::after{content:"+"; font-size:1.4rem; color:#8ea9ff;}
+    .dock-panel[data-side="left"] .panel-handle {
+      right: -1px;
+      transform: translate(100%, -50%);
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
 
-    .rename-input{background:transparent; border:1px dashed rgba(255,255,255,.25); color:#fff; border-radius:.25rem; font-size:.85rem; padding:.1rem .25rem; width:100%;}
+    .dock-panel[data-side="right"] .panel-handle {
+      left: -1px;
+      transform: translate(-100%, -50%);
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .dock-panel[data-side="left"][data-collapsed="0"] .panel-handle {
+      right: -1px;
+      transform: translate(100%, -50%);
+    }
+
+    .dock-panel[data-side="right"][data-collapsed="0"] .panel-handle {
+      left: -1px;
+      transform: translate(-100%, -50%);
+    }
+
+    .dock-panel .panel-handle .label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: .02em;
+      font-size: .7rem;
+      line-height: 1;
+    }
+
+    .toolbar {
+      gap: .5rem
+    }
+
+    .stage-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .stage-outer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      /* ✅ centra quando più piccolo */
+      place-items: center;
+      overflow: auto;
+      /* ✅ scrollbar orizzontale + verticale */
+    }
+
+    .stage {
+      position: relative;
+      background: var(--canvas-bg);
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .08) inset, 0 12px 30px rgba(0, 0, 0, .35);
+      overflow: hidden;
+      width: auto;
+      height: auto;
+      --zoom: 1;
+    }
+
+    .stage[data-orient="landscape"] {
+      aspect-ratio: 16/9;
+    }
+
+    .stage[data-orient="portrait"] {
+      aspect-ratio: 9/16;
+    }
+
+    .stage .stage-size {
+      /* trucco: il contenuto ha size "logica" base (100%/zoom), poi lo scaliamo */
+      width: calc(100% / var(--zoom));
+      height: calc(100% / var(--zoom));
+      transform: scale(var(--zoom));
+      transform-origin: 0 0;
+      /* scala dall'angolo in alto a sinistra */
+    }
+
+    .stage[data-grid="on"] .stage-size::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: var(--grid) var(--grid), var(--grid) var(--grid);
+    }
+
+    .stage[data-grid="on"][data-subgrid="on"] .stage-size::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(var(--grid-color-sub) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color-sub) 1px, transparent 1px);
+      background-size: calc(var(--grid)/2) calc(var(--grid)/2), calc(var(--grid)/2) calc(var(--grid)/2);
+    }
+
+    #stepCanvas {
+      position: absolute;
+      inset: 0;
+    }
+
+    .el {
+      position: absolute;
+      user-select: none;
+    }
+
+    .el.selected {
+      outline: 2px solid var(--sel);
+    }
+
+    .marquee {
+      position: absolute;
+      border: 1px dashed rgba(13, 110, 253, .7);
+      background: rgba(13, 110, 253, .1);
+      pointer-events: none;
+    }
+
+    .handles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .handle {
+      position: absolute;
+      width: var(--handle-size);
+      height: var(--handle-size);
+      background: var(--handle);
+      border: 2px solid var(--sel);
+      border-radius: 3px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+      pointer-events: auto;
+    }
+
+    .handle.nw {
+      top: -6px;
+      left: -6px;
+      cursor: nwse-resize;
+    }
+
+    .handle.n {
+      top: -6px;
+      left: calc(50% - 6px);
+      cursor: ns-resize;
+    }
+
+    .handle.ne {
+      top: -6px;
+      right: -6px;
+      cursor: nesw-resize;
+    }
+
+    .handle.e {
+      top: calc(50% - 6px);
+      right: -6px;
+      cursor: ew-resize;
+    }
+
+    .handle.se {
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+    }
+
+    .handle.s {
+      bottom: -6px;
+      left: calc(50% - 6px);
+      cursor: ns-resize;
+    }
+
+    .handle.sw {
+      bottom: -6px;
+      left: -6px;
+      cursor: nesw-resize;
+    }
+
+    .handle.w {
+      top: calc(50% - 6px);
+      left: -6px;
+      cursor: ew-resize;
+    }
+
+    .palette-item {
+      cursor: grab;
+    }
+
+    .palette-item:active {
+      cursor: grabbing;
+    }
+
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .steps-toolbar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .steps-toolbar .btn {
+      padding: .15rem .4rem;
+    }
+
+    .cat {
+      border-top: 1px dashed rgba(255, 255, 255, .15);
+      padding-top: .5rem;
+      margin-top: .5rem;
+    }
+
+    .cat:first-child {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .cat-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .cat-title {
+      font-weight: 600;
+      font-size: .9rem;
+    }
+
+    .cat-actions .btn {
+      padding: .1rem .35rem;
+    }
+
+    .cat-body {
+      margin-top: .35rem;
+    }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .5rem;
+    }
+
+    .thumb {
+      position: relative;
+      background: var(--thumb-bg);
+      border: 1px solid var(--thumb-border);
+      border-radius: .4rem;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .thumb .mini {
+      position: relative;
+      height: var(--thumb-h);
+      width: calc(var(--thumb-h) * 16 / 9);
+      background: #0b0c10;
+      margin: 0 auto;
+    }
+
+    .thumb[data-orient="portrait"] .mini {
+      width: calc(var(--thumb-h) * 9 / 16);
+      height: var(--thumb-h);
+    }
+
+    .thumb .mini .mini-canvas {
+      position: absolute;
+      inset: 0;
+    }
+
+    .thumb .label {
+      font-size: .75rem;
+      padding: .35rem .5rem;
+      color: #cbd3da;
+      border-top: 1px solid var(--thumb-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .thumb .label .title {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+
+    .thumb .label .title .badge {
+      font-weight: 600;
+    }
+
+    .thumb .actions {
+      display: flex;
+      gap: .3rem;
+    }
+
+    .thumb .actions .btn-icon {
+      border: 1px solid var(--thumb-border);
+      background: transparent;
+      color: #cbd3da;
+      padding: .15rem .3rem;
+      border-radius: .35rem;
+      line-height: 1;
+    }
+
+    .thumb .actions .btn-icon:hover {
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .thumb.active {
+      outline: 2px solid var(--sel);
+    }
+
+    .thumb.add .mini {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thumb.add .mini::after {
+      content: "+";
+      font-size: 1.4rem;
+      color: #8ea9ff;
+    }
+
+    .rename-input {
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, .25);
+      color: #fff;
+      border-radius: .25rem;
+      font-size: .85rem;
+      padding: .1rem .25rem;
+      width: 100%;
+    }
   </style>
 </head>
+
 <body>
   <div class="d-flex" style="height:100vh; overflow:hidden;">
     <div class="left-col me-2">
-      <aside class="sidebar dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Elementi" data-collapsed="0">
+      <aside class="sidebar dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Elementi"
+        data-collapsed="0">
         <div class="panel-body p-3">
           <h6 class="text-uppercase text-secondary">Elementi</h6>
           <div id="palette" class="vstack gap-2"></div>
           <hr>
           <div class="small text-secondary">Trascina un elemento nello step.
-            <div class="mt-2"><span class="badge text-bg-secondary">DEL</span> elimina, <span class="badge text-bg-secondary">←↑→↓</span> sposta (<span class="badge text-bg-secondary">Shift</span> = snap a griglia). <span class="badge text-bg-secondary">Ctrl+Z</span> annulla. Ctrl/Shift-click per multi-selezione.</div>
+            <div class="mt-2"><span class="badge text-bg-secondary">DEL</span> elimina, <span
+                class="badge text-bg-secondary">←↑→↓</span> sposta (<span class="badge text-bg-secondary">Shift</span> =
+              snap a griglia). <span class="badge text-bg-secondary">Ctrl+Z</span> annulla. Ctrl/Shift-click per
+              multi-selezione.</div>
           </div>
         </div>
       </aside>
 
-      <aside id="stepsPanel" class="dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Step" data-collapsed="1">
+      <aside id="stepsPanel" class="dock-panel border-secondary-subtle bg-dark-subtle" data-side="left"
+        data-title="Step" data-collapsed="1">
         <div class="panel-body p-3">
           <div class="steps-toolbar mb-2">
-            <button id="btnAddCat" class="btn btn-outline-light btn-sm" type="button" title="Nuova categoria">+ Categoria</button>
+            <button id="btnAddCat" class="btn btn-outline-light btn-sm" type="button" title="Nuova categoria">+
+              Categoria</button>
           </div>
           <div id="stepsCats" class="vstack gap-2"></div>
         </div>
@@ -124,7 +471,8 @@
     </div>
 
     <main class="stage-wrap d-flex flex-column">
-      <div class="toolbar d-flex align-items-center px-3 py-2 border-bottom border-secondary-subtle bg-dark-subtle flex-wrap">
+      <div
+        class="toolbar d-flex align-items-center px-3 py-2 border-bottom border-secondary-subtle bg-dark-subtle flex-wrap">
         <div class="btn-group me-2" role="group" aria-label="Orientamento">
           <input type="radio" class="btn-check" name="orient" id="orientLandscape" autocomplete="off" checked>
           <label class="btn btn-outline-light btn-sm" for="orientLandscape">16:9</label>
@@ -133,7 +481,8 @@
         </div>
         <div class="d-flex align-items-center me-3" style="min-width:280px;">
           <label for="gridRange" class="form-label me-2 mb-0 small">Snap/Grid</label>
-          <input type="range" class="form-range" id="gridRange" min="0" max="64" step="2" value="16" style="width:180px">
+          <input type="range" class="form-range" id="gridRange" min="0" max="64" step="2" value="16"
+            style="width:180px">
           <span id="gridVal" class="ms-2 small code">16px</span>
           <div class="form-check form-switch ms-3">
             <input class="form-check-input" type="checkbox" role="switch" id="subgridSwitch">
@@ -142,10 +491,12 @@
         </div>
         <div class="btn-group btn-group-sm me-2" role="group" aria-label="Align">
           <button type="button" class="btn btn-outline-light" data-cmd="align-left" title="Allinea sinistra">⟸</button>
-          <button type="button" class="btn btn-outline-light" data-cmd="align-hcenter" title="Allinea centro orizz.">╎</button>
+          <button type="button" class="btn btn-outline-light" data-cmd="align-hcenter"
+            title="Allinea centro orizz.">╎</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-right" title="Allinea destra">⟹</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-top" title="Allinea alto">⟰</button>
-          <button type="button" class="btn btn-outline-light" data-cmd="align-vcenter" title="Allinea centro vert.">━</button>
+          <button type="button" class="btn btn-outline-light" data-cmd="align-vcenter"
+            title="Allinea centro vert.">━</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-bottom" title="Allinea basso">⟱</button>
           <button type="button" class="btn btn-outline-light" data-cmd="dist-h" title="Distribuisci orizz.">⇤ ⇥</button>
           <button type="button" class="btn btn-outline-light" data-cmd="dist-v" title="Distribuisci vert.">⇑ ⇓</button>
@@ -185,4 +536,5 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="module" src="./src/main.js"></script>
 </body>
+
 </html>
