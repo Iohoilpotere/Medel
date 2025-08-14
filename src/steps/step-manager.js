@@ -1,21 +1,42 @@
 import { $, $$ } from '../core/utils.js';
 import { Step, Category } from './step-models.js';
+import { AddStepCommand, DeleteStepCommand, ChangeStepPropertyCommand, AddCategoryCommand } from '../commands/step-commands.js';
 
 export default class StepManager{
-  constructor(editor){ this.editor=editor; this.catsWrap=$('#stepsCats'); this.btnAddCat=$('#btnAddCat'); this.categories=[]; this.activeStep=null; this._thumbTimers=new Map(); this.init(); }
+  constructor(editor){
+    this.editor = editor;
+    this.catsWrap = $('#stepsCats');
+    this.btnAddCat = $('#btnAddCat');
+    this.categories = [];
+    this.activeStep = null;
+    this._thumbTimers = new Map();
+    // ❌ niente this.init() qui
+  }
+
   init(){
-    this.btnAddCat.addEventListener('click', ()=> this.addCategory());
-    const cat=this.addCategory('Predefinita');
-    const st=this.addStep(cat, 'Step 1');
+    this.btnAddCat.addEventListener('click', ()=> this.addCategoryWithCommand());
+    const cat = this.addCategoryWithCommand('Predefinita');
+    const st  = this.addStepWithCommand(cat, 'Step 1');
     this.setActive(st);
   }
-  addCategory(name='Nuova categoria'){
-    const c=new Category(name); this.categories.push(c); this.render(); return c;
+
+  addCategoryWithCommand(name='Nuova categoria'){
+    const c = new Category(name);
+    const cmd = new AddCategoryCommand(this.editor, c, 'Aggiungi categoria');
+    this.editor.commandMgr.executeCommand(cmd); // presuppone che editor.commandMgr esista
+    return c;
   }
   addStep(cat, name='Nuovo step'){
     const s=new Step(name, this.editor.stageEl.dataset.orient||'landscape');
     s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
     cat.steps.push(s); this.render(); return s;
+  }
+  addStepWithCommand(cat, name='Nuovo step'){
+    const s=new Step(name, this.editor.stageEl.dataset.orient||'landscape');
+    s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
+    const cmd = new AddStepCommand(this.editor, cat, s, 'Aggiungi step');
+    this.editor.commandMgr.executeCommand(cmd);
+    return s;
   }
   duplicateStep(cat, step){
     const copy=new Step(step.name+" (copia)", step.orient); copy.bgUrl=step.bgUrl;
@@ -37,15 +58,8 @@ export default class StepManager{
     return copy;
   }
   deleteStep(cat, step){
-    const idx=cat.steps.indexOf(step);
-    if(idx<0) return;
-    const wasActive = this.activeStep?.id===step.id;
-    cat.steps.splice(idx,1);
-    if(wasActive){
-      const next = cat.steps[idx] || cat.steps[idx-1] || this.categories.find(c=>c.steps.length)?.steps[0] || null;
-      if(next) this.setActive(next); else { this.activeStep=null; this.editor.loadStep(new Step('Vuoto')); }
-    }
-    this.render();
+    const cmd = new DeleteStepCommand(this.editor, cat, step, 'Elimina step');
+    this.editor.commandMgr.executeCommand(cmd);
   }
   setActive(step){ if(!step) return; this.activeStep=step; this.editor.loadStep(step); this.render(); }
   scheduleThumb(step){ clearTimeout(this._thumbTimers.get(step?.id)); const t=setTimeout(()=>{ step._thumbNeedsUpdate=true; this.render(); }, 250); this._thumbTimers.set(step?.id, t); }
@@ -64,7 +78,7 @@ export default class StepManager{
       const body=document.createElement('div'); body.className='cat-body'; body.style.display=cat.collapsed?'none':'block';
       const list=document.createElement('div'); list.className='thumbs';
       cat.steps.forEach((step,idx)=> list.appendChild(this.buildThumb(step, idx+1, cat)) );
-      const add=document.createElement('div'); add.className='thumb add'; add.innerHTML=`<div class="mini"></div><div class="label"><span>Nuovo step</span></div>`; add.addEventListener('click', ()=>{ const s=this.addStep(cat, `Step ${cat.steps.length+1}`); this.setActive(s); });
+      const add=document.createElement('div'); add.className='thumb add'; add.innerHTML=`<div class="mini"></div><div class="label"><span>Nuovo step</span></div>`; add.addEventListener('click', ()=>{ const s=this.addStepWithCommand(cat, `Step ${cat.steps.length+1}`); this.setActive(s); });
       list.appendChild(add);
       body.appendChild(list); catEl.appendChild(body);
       this.catsWrap.appendChild(catEl);

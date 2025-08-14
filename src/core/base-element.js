@@ -1,5 +1,7 @@
 import { $, $$, clamp, snapTo, pxToPct, pctToPx, clientToStage } from './utils.js';
 import Editor from '../editor/editor.js';
+import { MoveElementsCommand, ResizeElementsCommand } from '../commands/element-commands.js';
+
 export default class BaseElement {
   constructor(type, x=10, y=10, w=20, h=10){
     this.id = Editor.uid(type); this.type = type;
@@ -16,37 +18,286 @@ export default class BaseElement {
   ensureHandles(){ if($('.handles',this.dom)) return; const box=document.createElement('div'); box.className='handles'; ['nw','n','ne','e','se','s','sw','w'].forEach(d=>{ const h=document.createElement('div'); h.dataset.dir=d; h.className=`handle ${d}`; h.dataset.editorUi='1'; box.appendChild(h);}); this.dom.appendChild(box);}    
   removeHandles(){ $$('.handles',this.dom).forEach(n=>n.remove()); }
   attachInteractivity(){
-    this.dom.addEventListener('mousedown',(e)=>{
-      if(e.target.classList.contains('handle')) return;
-      if(e.ctrlKey||e.metaKey||e.shiftKey) Editor.instance.toggleSelect(this); else Editor.instance.selectOnly(this);
-      const stage=Editor.instance.stageEl; const start=clientToStage(e, stage);
-      const {x:sx,y:sy}=this; const grid=Editor.instance.gridPct();
-      const onMove=(ev)=>{ const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
-        let nx=sx+dx, ny=sy+dy; nx=clamp(snapTo(nx,grid.x),0,100-this.w); ny=clamp(snapTo(ny,grid.y),0,100-this.h); this.x=nx; this.y=ny; this.applyTransform(); Editor.instance.reflectSelection(); };
-      const onUp=()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+   this.dom.addEventListener('mousedown',(e)=>{
+  if (e.target.classList.contains('handle')) return;  // esclude i resize handle
+
+  // Gestione selezione coerente con prima
+   const wasSelected = this.selected;
+
+  // Ctrl/Cmd -> toggle selection e STOP: non avviare il drag
+  if (e.ctrlKey || e.metaKey) {
+    Editor.instance.toggleSelect(this);
+    return;
+  }
+
+  // Se non era selezionato, seleziona SOLO questo; se era già selezionato, lascia il gruppo com'è
+  if (!wasSelected) {
+    Editor.instance.selectOnly(this);
+  }
+  const stage   = Editor.instance.stageEl;
+  const start   = clientToStage(e, stage);
+  const selected= [...Editor.instance.selected];
+
+  // Snapshot posizioni iniziali di TUTTI i selezionati
+  const starts = selected.map(s => ({ s, x:s.x, y:s.y, w:s.w, h:s.h }));
+
+  const grid   = Editor.instance.gridPct();
+  const snapIt = e.shiftKey; // SHIFT = snap (coerente col resto dell'app)
+  let moved = false;
+
+  const onMove = (ev)=>{
+    ev.preventDefault();
+    const p  = clientToStage(ev, stage);
+    let dx = pxToPct(p.x - start.x, stage.clientWidth);
+    let dy = pxToPct(p.y - start.y, stage.clientHeight);
+    if (snapIt) { dx = snapTo(dx, grid.x); dy = snapTo(dy, grid.y); }
+
+    // Preview: muove TUTTI i selezionati, ciascuno clampato ai bordi
+    starts.forEach(({s, x, y, w, h})=>{
+      let nx = clamp(x + dx, 0, 100 - w);
+      let ny = clamp(y + dy, 0, 100 - h);
+      s.x = nx; s.y = ny; s.applyTransform();
     });
-    this.dom.addEventListener('mousedown',(e)=>{
-      const h=e.target.closest('.handle'); if(!h) return; e.stopPropagation();
-      Editor.instance.selectInclude(this);
-      const dir=h.dataset.dir; const stage=Editor.instance.stageEl; const start=clientToStage(e, stage);
-      const sx=this.x, sy=this.y, sw=this.w, sh=this.h; const aspect=sw/sh; const grid=Editor.instance.gridPct();
-      const onMove=(ev)=>{
-        const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
-        let nx=sx, ny=sy, nw=sw, nh=sh;
-        if(dir.includes('e')) nw = sw + dx;
-        if(dir.includes('s')) nh = sh + dy;
-        if(dir.includes('w')) { nx = sx + dx; nw = sw - dx; }
-        if(dir.includes('n')) { ny = sy + dy; nh = sh - dy; }
-        if(this.lockRatio){ if(dir==='e'||dir==='w') nh = nw / aspect; else if(dir==='n'||dir==='s') nw = nh * aspect; else { if(Math.abs(dx)>Math.abs(dy)){ nh = nw / aspect; } else { nw = nh * aspect; } } }
-        nw = Math.max(1, nw); nh = Math.max(1, nh);
-        nx = Math.max(0, Math.min(100-1, nx)); ny = Math.max(0, Math.min(100-1, ny));
-        if(nx+nw>100) nw = 100-nx; if(ny+nh>100) nh = 100-ny;
-        nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); nw = snapTo(nw, grid.x); nh = snapTo(nh, grid.y);
-        Object.assign(this,{x:nx,y:ny,w:nw,h:nh}); this.applyTransform(); Editor.instance.reflectSelection(); };
-      const onUp=()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    });
+    Editor.instance.reflectSelection();
+    moved = true;
+  };
+
+  const onUp = ()=>{
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onUp);
+
+    if (!moved) return;
+
+    // Delta finale calcolato sull'ancora (primo selezionato)
+    const anchorNow   = selected[0];
+    const anchorStart = starts.find(st => st.s === anchorNow);
+    const finalDx = anchorNow.x - anchorStart.x;
+    const finalDy = anchorNow.y - anchorStart.y;
+
+    // Ripristina le posizioni originali (cancella la preview)
+    starts.forEach(({s, x, y})=>{ s.x = x; s.y = y; s.applyTransform(); });
+
+    // Commit come unico comando (copre 1 o N elementi)
+    const cmd = new MoveElementsCommand(Editor.instance, selected, finalDx, finalDy, 'Sposta elementi');
+    Editor.instance.commandMgr.executeCommand(cmd);
+
+    Editor.instance.stepMgr.scheduleThumb(Editor.instance.stepMgr.activeStep);
+  };
+
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+});
+// === Resize: singolo con snap/lockRatio, multi con allineamento bordo comune ===
+this.dom.addEventListener('mousedown', (e)=>{
+  const h = e.target.closest('.handle');
+  if (!h) return;
+  e.stopPropagation();
+  e.preventDefault();
+
+  // assicurati che l'elemento sia dentro la selezione
+  if (!Editor.instance.selected.includes(this)) {
+    Editor.instance.selectInclude(this);
+  }
+
+  const dir   = h.dataset.dir;                // 'n','s','e','w','ne','se','sw','nw'
+  const stage = Editor.instance.stageEl;
+  const start = clientToStage(e, stage);
+
+  const grid        = Editor.instance.gridPct();
+  const snapEnabled = (Editor.instance.grid || 0) > 0;
+  const stepX       = grid.x || 0;
+  const stepY       = grid.y || 0;
+
+  const selected = [...Editor.instance.selected];
+  const multi    = selected.length > 1;
+  const isCorner = ['ne','se','sw','nw'].includes(dir);
+
+  // Minimi
+  const MIN_W = 1, MIN_H = 1;
+
+  // Helpers
+  const clampBox = (L,T,R,B)=>{
+    // min size
+    if (R - L < MIN_W) { if (dir.includes('w')) L = R - MIN_W; else R = L + MIN_W; }
+    if (B - T < MIN_H) { if (dir.includes('n')) T = B - MIN_H; else B = T + MIN_H; }
+
+    // limiti canvas
+    L = Math.max(0, Math.min(L, 99));
+    T = Math.max(0, Math.min(T, 99));
+    R = Math.max(1, Math.min(R, 100));
+    B = Math.max(1, Math.min(B, 100));
+
+    // ricontrollo minimi
+    if (R - L < MIN_W) R = L + MIN_W;
+    if (B - T < MIN_H) B = T + MIN_H;
+    return [L,T,R,B];
+  };
+  const snapInside = (v, step, minV, maxV)=>{
+    if (!snapEnabled || step <= 0) return Math.min(maxV, Math.max(minV, v));
+    let s = Math.round(v/step)*step;
+    if (s < minV) s = Math.ceil(minV/step)*step;
+    if (s > maxV) s = Math.floor(maxV/step)*step;
+    return Math.min(maxV, Math.max(minV, s));
+  };
+
+  let hasResized = false;
+
+  if (multi) {
+    // Multi-selezione: i corner non sono ammessi
+    if (isCorner) return;
+
+    // Snapshot dei bordi iniziali di TUTTI
+    const starts = selected.map(s => ({ s, L:s.x, T:s.y, R:s.x+s.w, B:s.y+s.h }));
+
+    // Bordi dell'elemento "ancora" (quello delle handle)
+    const anchor = { L:this.x, T:this.y, R:this.x+this.w, B:this.y+this.h };
+
+    // Limiti di gruppo per il bordo che stiamo trascinando
+    const lim = {
+      e: { min: Math.max(...starts.map(o => o.L + MIN_W)), max: 100, step: stepX },
+      w: { min: 0, max: Math.min(...starts.map(o => o.R - MIN_W)), step: stepX },
+      s: { min: Math.max(...starts.map(o => o.T + MIN_H)), max: 100, step: stepY },
+      n: { min: 0, max: Math.min(...starts.map(o => o.B - MIN_H)), step: stepY },
+    };
+
+    const onMove = (ev)=>{
+      hasResized = true;
+      const p  = clientToStage(ev, stage);
+      const dx = pxToPct(p.x - start.x, stage.clientWidth);
+      const dy = pxToPct(p.y - start.y, stage.clientHeight);
+
+      // target comune del bordo (allineamento)
+      let target;
+      if (dir === 'e') {
+        target = snapInside(anchor.R + dx, lim.e.step, lim.e.min, lim.e.max);
+        starts.forEach(o=>{
+          const L = o.L, R = target;
+          const w = Math.max(MIN_W, Math.min(R - L, 100 - L));
+          o.s.x = L; o.s.w = w; o.s.applyTransform();
+        });
+      } else if (dir === 'w') {
+        target = snapInside(anchor.L + dx, lim.w.step, lim.w.min, lim.w.max);
+        starts.forEach(o=>{
+          let L = Math.min(target, o.R - MIN_W);
+          L = Math.max(0, L);
+          const R = o.R;
+          o.s.x = L; o.s.w = R - L; o.s.applyTransform();
+        });
+      } else if (dir === 's') {
+        target = snapInside(anchor.B + dy, lim.s.step, lim.s.min, lim.s.max);
+        starts.forEach(o=>{
+          const T = o.T, B = target;
+          const h = Math.max(MIN_H, Math.min(B - T, 100 - T));
+          o.s.y = T; o.s.h = h; o.s.applyTransform();
+        });
+      } else if (dir === 'n') {
+        target = snapInside(anchor.T + dy, lim.n.step, lim.n.min, lim.n.max);
+        starts.forEach(o=>{
+          let T = Math.min(target, o.B - MIN_H);
+          T = Math.max(0, T);
+          const B = o.B;
+          o.s.y = T; o.s.h = B - T; o.s.applyTransform();
+        });
+      }
+
+      Editor.instance.reflectSelection();
+    };
+
+    const onUp = ()=>{
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      if (!hasResized) return;
+
+      const newBounds = selected.map(s => ({ x:s.x, y:s.y, w:s.w, h:s.h }));
+
+      // ripristina preview -> commit comando
+      starts.forEach(o=>{
+        o.s.x = o.L; o.s.y = o.T; o.s.w = o.R - o.L; o.s.h = o.B - o.T; 
+        o.s.applyTransform();
+      });
+
+      const cmd = new ResizeElementsCommand(Editor.instance, selected, newBounds, 'Ridimensiona selezione (bordo allineato)');
+      Editor.instance.commandMgr.executeCommand(cmd);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return;
+  }
+
+  // --- Singolo elemento (comportamento precedente, con snap/ratio) ---
+  const L0 = this.x, T0 = this.y, R0 = this.x + this.w, B0 = this.y + this.h;
+  const aspect = this.w / this.h;
+
+  const onMoveSingle = (ev)=>{
+    hasResized = true;
+    const p  = clientToStage(ev, stage);
+    const dx = pxToPct(p.x - start.x, stage.clientWidth);
+    const dy = pxToPct(p.y - start.y, stage.clientHeight);
+
+    let L = L0, T = T0, R = R0, B = B0;
+
+    if (dir.includes('e')) R = R0 + dx;
+    if (dir.includes('s')) B = B0 + dy;
+    if (dir.includes('w')) L = L0 + dx;
+    if (dir.includes('n')) T = T0 + dy;
+
+    // lockRatio o Shift = mantieni proporzioni (solo in selezione singola)
+    const keepRatio = this.lockRatio || ev.shiftKey;
+    if (keepRatio) {
+      let w = R - L, h = B - T;
+      if (dir === 'e' || dir === 'w') {
+        h = w / aspect;
+        if (dir.includes('n')) T = B - h; else B = T + h;
+      } else if (dir === 'n' || dir === 's') {
+        w = h * aspect;
+        if (dir.includes('w')) L = R - w; else R = L + w;
+      } else {
+        const hFromW = w / aspect;
+        const wFromH = h * aspect;
+        if (Math.abs(hFromW - h) < Math.abs(wFromH - w)) {
+          if (dir.includes('n')) T = B - hFromW; else B = T + hFromW;
+        } else {
+          if (dir.includes('w')) L = R - wFromH; else R = L + wFromH;
+        }
+      }
+    }
+
+    // clamp + snap sui bordi
+    [L,T,R,B] = clampBox(L,T,R,B);
+    if (snapEnabled) {
+      L = snapInside(L, stepX, 0, 99);
+      R = snapInside(R, stepX, L + MIN_W, 100);
+      T = snapInside(T, stepY, 0, 99);
+      B = snapInside(B, stepY, T + MIN_H, 100);
+      [L,T,R,B] = clampBox(L,T,R,B);
+    }
+
+    this.x = L; this.y = T; this.w = R - L; this.h = B - T;
+    this.applyTransform();
+    Editor.instance.reflectSelection();
+  };
+
+  const onUpSingle = ()=>{
+    window.removeEventListener('mousemove', onMoveSingle);
+    window.removeEventListener('mouseup', onUpSingle);
+    if (!hasResized) return;
+
+    const nb = [{ x:this.x, y:this.y, w:this.w, h:this.h }];
+    this.x = L0; this.y = T0; this.w = R0 - L0; this.h = B0 - T0;
+    this.applyTransform();
+
+    const cmd = new ResizeElementsCommand(Editor.instance, [this], nb, 'Ridimensiona elemento');
+    Editor.instance.commandMgr.executeCommand(cmd);
+  };
+
+  window.addEventListener('mousemove', onMoveSingle);
+  window.addEventListener('mouseup', onUpSingle);
+});
+
+
+
+
   }
   getPropSchema(){
     return [
