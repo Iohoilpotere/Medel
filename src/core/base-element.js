@@ -26,7 +26,7 @@ export default class BaseElement {
       let hasMoved = false;
       
       const onMove=(ev)=>{ const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
-        let nx=sx+dx, ny=sy+dy; nx=clamp(snapTo(nx,grid.x),0,100-this.w); ny=clamp(snapTo(ny,grid.y),0,100-this.h); this.x=nx; this.y=ny; this.applyTransform(); Editor.instance.reflectSelection(); };
+        let nx=sx+dx, ny=sy+dy; nx=clamp(snapTo(nx,grid.x),0,100-this.w); ny=clamp(snapTo(ny,grid.y),0,100-this.h); this.x=nx; this.y=ny; this.applyTransform(); Editor.instance.reflectSelection();
         hasMoved = true;
       };
       const onUp=()=>{ 
