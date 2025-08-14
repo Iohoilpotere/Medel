@@ -2,6 +2,8 @@ import { $, $$, clamp, uid, snapTo, pxToPct, pctToPx, clientToStage } from '../c
 import PanelManager from '../ui/panel-manager.js';
 import CaseExporter from './exporter.js';
 import StepManager from '../steps/step-manager.js';
+import CommandManager from '../commands/command-manager.js';
+import { AddElementCommand, DeleteElementsCommand, MoveElementsCommand, ChangePropertyCommand } from '../commands/element-commands.js';
 import LabelElement from '../elements/LabelElement.js';
 import ImageElement from '../elements/ImageElement.js';
 import TextBoxElement from '../elements/TextBoxElement.js';
@@ -19,6 +21,7 @@ export default class Editor{
     this.stepMgr=new StepManager(this);
     this.panelMgr=new PanelManager();
     this.caseExporter = new CaseExporter(this);
+    this.commandMgr = new CommandManager(this);
     window.__editor__ = this;
   }
   layoutStage(){
@@ -43,8 +46,24 @@ export default class Editor{
     range.addEventListener('input', e=> setGrid(e.target.value)); setGrid(range.value);
     $('#subgridSwitch').addEventListener('change', e=>{ this.subgrid=e.target.checked; this.stageEl.dataset.subgrid = this.subgrid? 'on':'off'; });
     $('#setBg').addEventListener('click', ()=>{ const url=$('#bgUrl').value.trim(); this.setBackground(url); });
+    
+    // Add undo/redo buttons to toolbar
+    const undoRedoGroup = document.createElement('div');
+    undoRedoGroup.className = 'btn-group btn-group-sm me-2';
+    undoRedoGroup.innerHTML = `
+      <button id="btnUndo" type="button" class="btn btn-outline-light" title="Annulla (Ctrl+Z)" disabled>↶</button>
+      <button id="btnRedo" type="button" class="btn btn-outline-light" title="Ripeti (Ctrl+Y)" disabled>↷</button>
+    `;
+    
+    // Insert after the align buttons
+    const alignGroup = document.querySelector('.btn-group[aria-label="Align"]');
+    alignGroup.parentNode.insertBefore(undoRedoGroup, alignGroup.nextSibling);
+    
+    $('#btnUndo').addEventListener('click', () => this.commandMgr.undo());
+    $('#btnRedo').addEventListener('click', () => this.commandMgr.redo());
+    
     this.stageEl.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-    this.stageEl.addEventListener('drop', (e)=>{ e.preventDefault(); const type=e.dataTransfer.getData('text/plain'); const el=this.createElementByType(type); if(!el) return; const p=clientToStage(e,this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth)/2, this.stageEl.clientWidth),0,100-el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight)/2, this.stageEl.clientHeight),0,100-el.h); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
+    this.stageEl.addEventListener('drop', (e)=>{ e.preventDefault(); const type=e.dataTransfer.getData('text/plain'); const el=this.createElementByType(type); if(!el) return; const p=clientToStage(e,this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth)/2, this.stageEl.clientWidth),0,100-el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight)/2, this.stageEl.clientHeight),0,100-el.h); const cmd = new AddElementCommand(this, el, `Aggiungi ${type}`); this.commandMgr.executeCommand(cmd); });
     this.stageEl.addEventListener('mousedown', (e)=>{ if(e.target===this.stageEl || e.target===this.canvas || e.target.classList.contains('stage-size')){ if(!e.shiftKey&&!e.ctrlKey) this.clearSelection();
         const start=clientToStage(e,this.stageEl); const mq=$('#marquee'); mq.classList.remove('d-none'); Object.assign(mq.style,{left:start.x+'px',top:start.y+'px',width:0,height:0});
         const onMove=(ev)=>{ const p=clientToStage(ev,this.stageEl); const x=Math.min(start.x,p.x), y=Math.min(start.y,p.y), w=Math.abs(p.x-start.x), h=Math.abs(p.y-start.y); Object.assign(mq.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
@@ -58,6 +77,11 @@ export default class Editor{
   }
   initKeyboard(){
     window.addEventListener('keydown',(e)=>{
+      // Skip if command manager handles it (Ctrl+Z, etc.)
+      if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
+        return; // Let CommandManager handle these
+      }
+      
       if(!this.selected.length) return;
       const isArrow=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key);
       if(isArrow || e.key==='Delete') e.preventDefault();
@@ -65,7 +89,7 @@ export default class Editor{
       const stepY = e.shiftKey ? (this.gridPct().y || pxToPct(8,this.stageEl.clientHeight)) : pxToPct(1, this.stageEl.clientHeight);
       const useSnap = e.shiftKey;
       switch(e.key){
-        case 'Delete': this.deleteSelected(); break;
+        case 'Delete': this.deleteSelectedWithCommand(); break;
         case 'ArrowLeft':  this.nudge(-stepX, 0, {snap:useSnap}); break;
         case 'ArrowRight': this.nudge( stepX, 0, {snap:useSnap}); break;
         case 'ArrowUp':    this.nudge( 0, -stepY, {snap:useSnap}); break;
@@ -75,15 +99,34 @@ export default class Editor{
   }
   onElementChanged(){ if(!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce=setTimeout(()=> this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
   nudge(dx,dy,opts={snap:false}){
+    if (!this.selected.length) return;
+    
     const grid=this.gridPct();
-    this.selected.forEach(el=>{
-      let nx=el.x+dx, ny=el.y+dy;
-      if(opts.snap){ nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); }
-      nx = Math.max(0, Math.min(100-el.w, nx));
-      ny = Math.max(0, Math.min(100-el.h, ny));
-      el.x=nx; el.y=ny; el.applyTransform();
+    
+    // Calculate final positions with constraints
+    const finalDx = dx, finalDy = dy;
+    let canMove = true;
+    
+    // Check if all elements can move to new positions
+    this.selected.forEach(el => {
+      let nx = el.x + finalDx, ny = el.y + finalDy;
+      if (opts.snap) {
+        nx = snapTo(nx, grid.x);
+        ny = snapTo(ny, grid.y);
+      }
+      nx = Math.max(0, Math.min(100 - el.w, nx));
+      ny = Math.max(0, Math.min(100 - el.h, ny));
+      
+      // If position would be clamped, adjust the delta
+      if (Math.abs(nx - (el.x + finalDx)) > 0.01 || Math.abs(ny - (el.y + finalDy)) > 0.01) {
+        canMove = false;
+      }
     });
-    this.reflectSelection();
+    
+    if (canMove) {
+      const cmd = new MoveElementsCommand(this, this.selected, finalDx, finalDy, 'Sposta elementi');
+      this.commandMgr.executeCommand(cmd);
+    }
   }
   seedPalette(){
     const items=[ 
@@ -94,7 +137,7 @@ export default class Editor{
       {type:'radiogroup',title:'Opzioni (radio)',klass:RadioGroupElement} 
     ];
     this.registry=new Map(items.map(i=>[i.type,i]));
-    items.forEach(i=>{ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable=true; b.dataset.type=i.type; b.innerHTML=`<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart',(e)=> e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', ()=>{ const el=this.createElementByType(i.type); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); this.palette.appendChild(b); });
+    items.forEach(i=>{ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable=true; b.dataset.type=i.type; b.innerHTML=`<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart',(e)=> e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', ()=>{ const el=this.createElementByType(i.type); const cmd = new AddElementCommand(this, el, `Aggiungi ${i.type}`); this.commandMgr.executeCommand(cmd); }); this.palette.appendChild(b); });
   }
   createElementByType(type){ const meta=this.registry.get(type); return meta? new meta.klass():null; }
   clearSelection(){ this.selected.forEach(e=>e.setSelected(false)); this.selected=[]; this.renderPropPanel(); }
@@ -103,6 +146,11 @@ export default class Editor{
   selectInclude(el){ if(!this.selected.includes(el)) this.selected.push(el); el.setSelected(true); this.renderPropPanel(); }
   reflectSelection(){ if(this.selected.length!==1) { this.renderPropPanel(); return; } const sel=this.selected[0]; $$('#propForm [data-prop]').forEach(inp=>{ const k=inp.dataset.prop; if(['x','y','w','h','z','fontSize'].includes(k)) inp.value= sel[k]; if(k==='lockRatio') inp.checked=!!sel.lockRatio; }); }
   deleteSelected(){ this.selected.forEach(s=>{ s.dom.remove(); this.elements=this.elements.filter(e=>e!==s); }); this.clearSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
+  deleteSelectedWithCommand(){ 
+    if (!this.selected.length) return;
+    const cmd = new DeleteElementsCommand(this, this.selected, 'Elimina elementi');
+    this.commandMgr.executeCommand(cmd);
+  }
   renderPropPanel(){ const f=this.propForm; f.innerHTML='';
     if(!this.selected.length){
       const step=this.stepMgr?.activeStep; if(!step){ f.innerHTML='<div class="text-secondary small">Nessuno step attivo</div>'; return; }
@@ -120,14 +168,19 @@ export default class Editor{
     if(this.selected.length>1){ f.innerHTML='<div class="text-secondary small">Selezionati: '+this.selected.length+' elementi</div>'; return; }
     const el=this.selected[0]; const schema=el.getPropSchema();
     const header=document.createElement('div'); header.className='d-flex justify-content-between align-items-center mb-1'; header.innerHTML=`<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
-    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete',header).addEventListener('click',(e)=>{ e.preventDefault(); this.selectOnly(el); this.deleteSelected(); });
+    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete',header).addEventListener('click',(e)=>{ e.preventDefault(); this.selectOnly(el); this.deleteSelectedWithCommand(); });
     schema.forEach(def=>{ const row=document.createElement('div'); row.className='mb-2'; const id=Editor.uid('prop'); const label=document.createElement('label'); label.className='form-label small'; label.htmlFor=id; label.textContent=def.label; let input;
       if(def.type==='textarea'){ input=document.createElement('textarea'); input.className='form-control form-control-sm'; input.rows=2; }
       else if(def.type==='select'){ input=document.createElement('select'); input.className='form-select form-select-sm'; def.options.forEach(([v,lab])=>{ const o=document.createElement('option'); o.value=v; o.textContent=lab; input.appendChild(o); }); }
       else if(def.type==='checkbox'){ input=document.createElement('input'); input.type='checkbox'; input.className='form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id=id; input.dataset.prop=def.key; input.checked=!!el[def.key]; input.addEventListener('input', ()=>{ el[def.key]=input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
       else{ input=document.createElement('input'); input.type=def.type||'text'; input.className='form-control form-control-sm'; if(def.min!=null) input.min=def.min; }
       input.id=id; input.dataset.prop=def.key; let v=el[def.key]; if(def.key==='options') v=el.options.join(';'); if(def.type!=='checkbox') input.value = v ?? '';
-      input.addEventListener('input', ()=>{ let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); el[def.key]=val; if(['x','y','w','h','z'].includes(def.key)) el.applyTransform(); else el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
+      input.addEventListener('input', ()=>{ 
+        const oldVal = el[def.key];
+        let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); 
+        const cmd = new ChangePropertyCommand(this, el, def.key, val, oldVal, `Modifica ${def.label.toLowerCase()}`);
+        this.commandMgr.executeCommand(cmd);
+      });
       row.appendChild(label); row.appendChild(input); f.appendChild(row); });
   }
   execCommand(cmd){ const sel=[...this.selected]; if(sel.length<1) return; const bbox={ minX:Math.min(...sel.map(e=>e.x)), maxX:Math.max(...sel.map(e=>e.x+e.w)), minY:Math.min(...sel.map(e=>e.y)), maxY:Math.max(...sel.map(e=>e.y+e.h)) };
