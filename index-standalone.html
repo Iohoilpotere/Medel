@@ -1,122 +1,462 @@
 <!DOCTYPE html>
 <html lang="it">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Medel – Editor Step (Prototype v2.6.1, modular)</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    :root{
-      --canvas-bg:#0b0c10; --grid-color:rgba(255,255,255,.12); --grid-color-sub:rgba(255,255,255,.06);
-      --sel:#0d6efd; --handle:#fff; --handle-size:10px;
-      --panel-gap:8px;
-      --thumb-bg:#13151a; --thumb-border:rgba(255,255,255,.14);
-      --thumb-h:76px;
-      --collapsed-h:48px;
+    :root {
+      --canvas-bg: #0b0c10;
+      --grid-color: rgba(255, 255, 255, .12);
+      --grid-color-sub: rgba(255, 255, 255, .06);
+      --sel: #0d6efd;
+      --handle: #fff;
+      --handle-size: 10px;
+      --panel-gap: 8px;
+      --thumb-bg: #13151a;
+      --thumb-border: rgba(255, 255, 255, .14);
+      --thumb-h: 76px;
+      --collapsed-h: 48px;
     }
-    html,body{height:100%;}
-    body{background:#0e0f13;color:#e9ecef;}
 
-    .left-col{display:flex; flex-direction:column; gap:var(--panel-gap); height:100%;}
-    .left-col > .dock-panel{flex:1 1 auto; min-height:0;}
-    .left-col > .dock-panel[data-collapsed="1"]{flex:0 0 var(--collapsed-h);}
-
-    .dock-panel{position:relative; display:flex; flex-direction:column; --panel-expanded-w:260px; --panel-collapsed-w:44px; width:var(--panel-expanded-w); transition:width .2s ease; background:#21252b; border:1px solid rgba(255,255,255,.12); border-radius:.5rem; overflow:visible;}
-    .dock-panel[data-collapsed="1"]{background:transparent; border-color:transparent; box-shadow:none;}
-    .sidebar{--panel-expanded-w:260px;}
-    .propbar{--panel-expanded-w:320px;}
-    .dock-panel[data-collapsed="1"]{width:var(--panel-collapsed-w);} 
-    .dock-panel .panel-body{flex:1; overflow:auto;}
-    .dock-panel[data-collapsed="1"] .panel-body{display:none;}
-
-    .dock-panel .panel-handle{
-      position:absolute; top:50%; transform:translate(0,-50%);
-      padding:.15rem .35rem; background:#1c1f24; color:#e9ecef;
-      border:1px solid rgba(255,255,255,.15); z-index:10; cursor:pointer;
-      border-radius:.375rem; opacity:.9;
+    html,
+    body {
+      height: 100%;
     }
-    .dock-panel[data-side="left"]  .panel-handle{right:-1px; transform:translate(100%,-50%); border-top-left-radius:0;  border-bottom-left-radius:0;}
-    .dock-panel[data-side="right"] .panel-handle{left:-1px;  transform:translate(-100%,-50%); border-top-right-radius:0; border-bottom-right-radius:0;}
-    .dock-panel[data-side="left"][data-collapsed="0"]  .panel-handle{ right:-1px; transform:translate(100%,-50%);}
-    .dock-panel[data-side="right"][data-collapsed="0"] .panel-handle{ left:-1px; transform:translate(-100%,-50%);}
 
-    .dock-panel .panel-handle .label{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:.02em; font-size:.7rem; line-height:1; }
+    body {
+      background: #0e0f13;
+      color: #e9ecef;
+    }
 
-    .toolbar{gap:.5rem}
+    .left-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--panel-gap);
+      height: 100%;
+    }
 
-    .stage-wrap{flex:1;min-width:0;}
-    .stage-outer{position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
+    .left-col>.dock-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
 
-    .stage{position:relative; background:var(--canvas-bg); border-radius:10px; box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 12px 30px rgba(0,0,0,.35); overflow:hidden; width:auto; height:auto;}
-    .stage[data-orient="landscape"]{aspect-ratio:16/9;}
-    .stage[data-orient="portrait"]{aspect-ratio:9/16;}
+    .left-col>.dock-panel[data-collapsed="1"] {
+      flex: 0 0 var(--collapsed-h);
+    }
 
-    .stage-size{position:relative; width:100%; height:100%;}
+    .dock-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      --panel-expanded-w: 260px;
+      --panel-collapsed-w: 44px;
+      width: var(--panel-expanded-w);
+      transition: width .2s ease;
+      background: #21252b;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: .5rem;
+      overflow: visible;
+    }
 
-    .stage[data-grid="on"] .stage-size::before{content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px); background-size: var(--grid) var(--grid), var(--grid) var(--grid);}    
-    .stage[data-grid="on"][data-subgrid="on"] .stage-size::after{content:""; position:absolute; inset:0; pointer-events:none; background-image: linear-gradient(var(--grid-color-sub) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color-sub) 1px, transparent 1px); background-size: calc(var(--grid)/2) calc(var(--grid)/2), calc(var(--grid)/2) calc(var(--grid)/2);}    
+    .dock-panel[data-collapsed="1"] {
+      background: transparent;
+      border-color: transparent;
+      box-shadow: none;
+    }
 
-    #stepCanvas{position:absolute; inset:0;}
+    .sidebar {
+      --panel-expanded-w: 260px;
+    }
 
-    .el{position:absolute; user-select:none;}
-    .el.selected{outline:2px solid var(--sel);}    
-    .marquee{position:absolute;border:1px dashed rgba(13,110,253,.7);background:rgba(13,110,253,.1);pointer-events:none;}
+    .propbar {
+      --panel-expanded-w: 320px;
+    }
 
-    .handles{position:absolute; inset:0; pointer-events:none;}
-    .handle{position:absolute; width:var(--handle-size); height:var(--handle-size); background:var(--handle); border:2px solid var(--sel); border-radius:3px; box-shadow:0 1px 2px rgba(0,0,0,.4); pointer-events:auto;}
-    .handle.nw{top:-6px; left:-6px; cursor:nwse-resize;} .handle.n{top:-6px; left:calc(50% - 6px); cursor:ns-resize;} .handle.ne{top:-6px; right:-6px; cursor:nesw-resize;}
-    .handle.e{top:calc(50% - 6px); right:-6px; cursor:ew-resize;} .handle.se{bottom:-6px; right:-6px; cursor:nwse-resize;} .handle.s{bottom:-6px; left:calc(50% - 6px); cursor:ns-resize;}
-    .handle.sw{bottom:-6px; left:-6px; cursor:nesw-resize;} .handle.w{top:calc(50% - 6px); left:-6px; cursor:ew-resize;}
+    .dock-panel[data-collapsed="1"] {
+      width: var(--panel-collapsed-w);
+    }
 
-    .palette-item{cursor:grab;} .palette-item:active{cursor:grabbing;}
-    .code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    .dock-panel .panel-body {
+      flex: 1;
+      overflow: auto;
+    }
 
-    .steps-toolbar{display:flex; align-items:center; gap:.5rem;}
-    .steps-toolbar .btn{padding:.15rem .4rem;}
-    .cat{border-top:1px dashed rgba(255,255,255,.15); padding-top:.5rem; margin-top:.5rem;}
-    .cat:first-child{border-top:none; padding-top:0; margin-top:0;}
-    .cat-head{display:flex; align-items:center; justify-content:space-between; gap:.5rem;}
-    .cat-title{font-weight:600; font-size:.9rem;}
-    .cat-actions .btn{padding:.1rem .35rem;}
-    .cat-body{margin-top:.35rem;}
-    .thumbs{display:grid; grid-template-columns:1fr; gap:.5rem;}
+    .dock-panel[data-collapsed="1"] .panel-body {
+      display: none;
+    }
 
-    .thumb{position:relative; background:var(--thumb-bg); border:1px solid var(--thumb-border); border-radius:.4rem; overflow:hidden; cursor:pointer;}
-    .thumb .mini{position:relative; height:var(--thumb-h); width:calc(var(--thumb-h) * 16 / 9); background:#0b0c10; margin:0 auto;}
-    .thumb[data-orient="portrait"] .mini{width:calc(var(--thumb-h) * 9 / 16); height:var(--thumb-h);}    
-    .thumb .mini .mini-canvas{position:absolute; inset:0;}
-    .thumb .label{font-size:.75rem; padding:.35rem .5rem; color:#cbd3da; border-top:1px solid var(--thumb-border); display:flex; align-items:center; justify-content:space-between; gap:.5rem;}
-    .thumb .label .title{display:flex; align-items:center; gap:.4rem;}
-    .thumb .label .title .badge{font-weight:600;}
-    .thumb .actions{display:flex; gap:.3rem;}
-    .thumb .actions .btn-icon{border:1px solid var(--thumb-border); background:transparent; color:#cbd3da; padding:.15rem .3rem; border-radius:.35rem; line-height:1;}
-    .thumb .actions .btn-icon:hover{background:rgba(255,255,255,.06);}    
-    .thumb.active{outline:2px solid var(--sel);}
+    .dock-panel .panel-handle {
+      position: absolute;
+      top: 50%;
+      transform: translate(0, -50%);
+      padding: .15rem .35rem;
+      background: #1c1f24;
+      color: #e9ecef;
+      border: 1px solid rgba(255, 255, 255, .15);
+      z-index: 10;
+      cursor: pointer;
+      border-radius: .375rem;
+      opacity: .9;
+    }
 
-    .thumb.add .mini{display:flex; align-items:center; justify-content:center;}
-    .thumb.add .mini::after{content:"+"; font-size:1.4rem; color:#8ea9ff;}
+    .dock-panel[data-side="left"] .panel-handle {
+      right: -1px;
+      transform: translate(100%, -50%);
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
 
-    .rename-input{background:transparent; border:1px dashed rgba(255,255,255,.25); color:#fff; border-radius:.25rem; font-size:.85rem; padding:.1rem .25rem; width:100%;}
+    .dock-panel[data-side="right"] .panel-handle {
+      left: -1px;
+      transform: translate(-100%, -50%);
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .dock-panel[data-side="left"][data-collapsed="0"] .panel-handle {
+      right: -1px;
+      transform: translate(100%, -50%);
+    }
+
+    .dock-panel[data-side="right"][data-collapsed="0"] .panel-handle {
+      left: -1px;
+      transform: translate(-100%, -50%);
+    }
+
+    .dock-panel .panel-handle .label {
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      letter-spacing: .02em;
+      font-size: .7rem;
+      line-height: 1;
+    }
+
+    .toolbar {
+      gap: .5rem
+    }
+
+    .stage-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .stage-outer {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stage {
+      position: relative;
+      background: var(--canvas-bg);
+      border-radius: 10px;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .08) inset, 0 12px 30px rgba(0, 0, 0, .35);
+      overflow: hidden;
+      width: auto;
+      height: auto;
+    }
+
+    .stage[data-orient="landscape"] {
+      aspect-ratio: 16/9;
+    }
+
+    .stage[data-orient="portrait"] {
+      aspect-ratio: 9/16;
+    }
+
+    .stage-size {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stage[data-grid="on"] .stage-size::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(var(--grid-color) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: var(--grid) var(--grid), var(--grid) var(--grid);
+    }
+
+    .stage[data-grid="on"][data-subgrid="on"] .stage-size::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(var(--grid-color-sub) 1px, transparent 1px), linear-gradient(90deg, var(--grid-color-sub) 1px, transparent 1px);
+      background-size: calc(var(--grid)/2) calc(var(--grid)/2), calc(var(--grid)/2) calc(var(--grid)/2);
+    }
+
+    #stepCanvas {
+      position: absolute;
+      inset: 0;
+    }
+
+    .el {
+      position: absolute;
+      user-select: none;
+    }
+
+    .el.selected {
+      outline: 2px solid var(--sel);
+    }
+
+    .marquee {
+      position: absolute;
+      border: 1px dashed rgba(13, 110, 253, .7);
+      background: rgba(13, 110, 253, .1);
+      pointer-events: none;
+    }
+
+    .handles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .handle {
+      position: absolute;
+      width: var(--handle-size);
+      height: var(--handle-size);
+      background: var(--handle);
+      border: 2px solid var(--sel);
+      border-radius: 3px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .4);
+      pointer-events: auto;
+    }
+
+    .handle.nw {
+      top: -6px;
+      left: -6px;
+      cursor: nwse-resize;
+    }
+
+    .handle.n {
+      top: -6px;
+      left: calc(50% - 6px);
+      cursor: ns-resize;
+    }
+
+    .handle.ne {
+      top: -6px;
+      right: -6px;
+      cursor: nesw-resize;
+    }
+
+    .handle.e {
+      top: calc(50% - 6px);
+      right: -6px;
+      cursor: ew-resize;
+    }
+
+    .handle.se {
+      bottom: -6px;
+      right: -6px;
+      cursor: nwse-resize;
+    }
+
+    .handle.s {
+      bottom: -6px;
+      left: calc(50% - 6px);
+      cursor: ns-resize;
+    }
+
+    .handle.sw {
+      bottom: -6px;
+      left: -6px;
+      cursor: nesw-resize;
+    }
+
+    .handle.w {
+      top: calc(50% - 6px);
+      left: -6px;
+      cursor: ew-resize;
+    }
+
+    .palette-item {
+      cursor: grab;
+    }
+
+    .palette-item:active {
+      cursor: grabbing;
+    }
+
+    .code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    .steps-toolbar {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    .steps-toolbar .btn {
+      padding: .15rem .4rem;
+    }
+
+    .cat {
+      border-top: 1px dashed rgba(255, 255, 255, .15);
+      padding-top: .5rem;
+      margin-top: .5rem;
+    }
+
+    .cat:first-child {
+      border-top: none;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .cat-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .cat-title {
+      font-weight: 600;
+      font-size: .9rem;
+    }
+
+    .cat-actions .btn {
+      padding: .1rem .35rem;
+    }
+
+    .cat-body {
+      margin-top: .35rem;
+    }
+
+    .thumbs {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: .5rem;
+    }
+
+    .thumb {
+      position: relative;
+      background: var(--thumb-bg);
+      border: 1px solid var(--thumb-border);
+      border-radius: .4rem;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .thumb .mini {
+      position: relative;
+      height: var(--thumb-h);
+      width: calc(var(--thumb-h) * 16 / 9);
+      background: #0b0c10;
+      margin: 0 auto;
+    }
+
+    .thumb[data-orient="portrait"] .mini {
+      width: calc(var(--thumb-h) * 9 / 16);
+      height: var(--thumb-h);
+    }
+
+    .thumb .mini .mini-canvas {
+      position: absolute;
+      inset: 0;
+    }
+
+    .thumb .label {
+      font-size: .75rem;
+      padding: .35rem .5rem;
+      color: #cbd3da;
+      border-top: 1px solid var(--thumb-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .thumb .label .title {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+
+    .thumb .label .title .badge {
+      font-weight: 600;
+    }
+
+    .thumb .actions {
+      display: flex;
+      gap: .3rem;
+    }
+
+    .thumb .actions .btn-icon {
+      border: 1px solid var(--thumb-border);
+      background: transparent;
+      color: #cbd3da;
+      padding: .15rem .3rem;
+      border-radius: .35rem;
+      line-height: 1;
+    }
+
+    .thumb .actions .btn-icon:hover {
+      background: rgba(255, 255, 255, .06);
+    }
+
+    .thumb.active {
+      outline: 2px solid var(--sel);
+    }
+
+    .thumb.add .mini {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .thumb.add .mini::after {
+      content: "+";
+      font-size: 1.4rem;
+      color: #8ea9ff;
+    }
+
+    .rename-input {
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, .25);
+      color: #fff;
+      border-radius: .25rem;
+      font-size: .85rem;
+      padding: .1rem .25rem;
+      width: 100%;
+    }
   </style>
 </head>
+
 <body>
   <div class="d-flex" style="height:100vh; overflow:hidden;">
     <div class="left-col me-2">
-      <aside class="sidebar dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Elementi" data-collapsed="0">
+      <aside class="sidebar dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Elementi"
+        data-collapsed="0">
         <div class="panel-body p-3">
           <h6 class="text-uppercase text-secondary">Elementi</h6>
           <div id="palette" class="vstack gap-2"></div>
           <hr>
           <div class="small text-secondary">Trascina un elemento nello step.
-            <div class="mt-2"><span class="badge text-bg-secondary">DEL</span> elimina, <span class="badge text-bg-secondary">←↑→↓</span> sposta (<span class="badge text-bg-secondary">Shift</span> = snap a griglia). Ctrl/Shift-click per multi-selezione.</div>
+            <div class="mt-2"><span class="badge text-bg-secondary">DEL</span> elimina, <span
+                class="badge text-bg-secondary">←↑→↓</span> sposta (<span class="badge text-bg-secondary">Shift</span> =
+              snap a griglia). Ctrl/Shift-click per multi-selezione.</div>
           </div>
         </div>
       </aside>
 
-      <aside id="stepsPanel" class="dock-panel border-secondary-subtle bg-dark-subtle" data-side="left" data-title="Step" data-collapsed="1">
+      <aside id="stepsPanel" class="dock-panel border-secondary-subtle bg-dark-subtle" data-side="left"
+        data-title="Step" data-collapsed="1">
         <div class="panel-body p-3">
           <div class="steps-toolbar mb-2">
-            <button id="btnAddCat" class="btn btn-outline-light btn-sm" type="button" title="Nuova categoria">+ Categoria</button>
+            <button id="btnAddCat" class="btn btn-outline-light btn-sm" type="button" title="Nuova categoria">+
+              Categoria</button>
           </div>
           <div id="stepsCats" class="vstack gap-2"></div>
         </div>
@@ -124,7 +464,8 @@
     </div>
 
     <main class="stage-wrap d-flex flex-column">
-      <div class="toolbar d-flex align-items-center px-3 py-2 border-bottom border-secondary-subtle bg-dark-subtle flex-wrap">
+      <div
+        class="toolbar d-flex align-items-center px-3 py-2 border-bottom border-secondary-subtle bg-dark-subtle flex-wrap">
         <div class="btn-group me-2" role="group" aria-label="Orientamento">
           <input type="radio" class="btn-check" name="orient" id="orientLandscape" autocomplete="off" checked>
           <label class="btn btn-outline-light btn-sm" for="orientLandscape">16:9</label>
@@ -133,7 +474,8 @@
         </div>
         <div class="d-flex align-items-center me-3" style="min-width:280px;">
           <label for="gridRange" class="form-label me-2 mb-0 small">Snap/Grid</label>
-          <input type="range" class="form-range" id="gridRange" min="0" max="64" step="2" value="16" style="width:180px">
+          <input type="range" class="form-range" id="gridRange" min="0" max="64" step="2" value="16"
+            style="width:180px">
           <span id="gridVal" class="ms-2 small code">16px</span>
           <div class="form-check form-switch ms-3">
             <input class="form-check-input" type="checkbox" role="switch" id="subgridSwitch">
@@ -142,10 +484,12 @@
         </div>
         <div class="btn-group btn-group-sm me-2" role="group" aria-label="Align">
           <button type="button" class="btn btn-outline-light" data-cmd="align-left" title="Allinea sinistra">⟸</button>
-          <button type="button" class="btn btn-outline-light" data-cmd="align-hcenter" title="Allinea centro orizz.">╎</button>
+          <button type="button" class="btn btn-outline-light" data-cmd="align-hcenter"
+            title="Allinea centro orizz.">╎</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-right" title="Allinea destra">⟹</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-top" title="Allinea alto">⟰</button>
-          <button type="button" class="btn btn-outline-light" data-cmd="align-vcenter" title="Allinea centro vert.">━</button>
+          <button type="button" class="btn btn-outline-light" data-cmd="align-vcenter"
+            title="Allinea centro vert.">━</button>
           <button type="button" class="btn btn-outline-light" data-cmd="align-bottom" title="Allinea basso">⟱</button>
           <button type="button" class="btn btn-outline-light" data-cmd="dist-h" title="Distribuisci orizz.">⇤ ⇥</button>
           <button type="button" class="btn btn-outline-light" data-cmd="dist-v" title="Distribuisci vert.">⇑ ⇓</button>
@@ -184,256 +528,259 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-// ---- src/core/utils.js ----
-const $ = (s, c=document)=>c.querySelector(s);
-const $$ = (s, c=document)=>Array.from(c.querySelectorAll(s));
-const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
-const uid=(p='el')=>`${p}-${Math.random().toString(36).slice(2,8)}`;
-const _uid = uid;
-const snapTo=(v, grid)=> grid? Math.round(v/grid)*grid : v;
-const pxToPct=(px, base)=> (base? (px/base*100):0);
-const pctToPx=(pct, base)=> (base* pct/100);
-const clientToStage=(ev, stage)=>{ const r=stage.getBoundingClientRect(); return {x: ev.clientX-r.left, y: ev.clientY-r.top}; };
+    // ---- src/core/utils.js ----
+    const $ = (s, c = document) => c.querySelector(s);
+    const $$ = (s, c = document) => Array.from(c.querySelectorAll(s));
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const uid = (p = 'el') => `${p}-${Math.random().toString(36).slice(2, 8)}`;
+    const _uid = uid;
+    const snapTo = (v, grid) => grid ? Math.round(v / grid) * grid : v;
+    const pxToPct = (px, base) => (base ? (px / base * 100) : 0);
+    const pctToPx = (pct, base) => (base * pct / 100);
+    const clientToStage = (ev, stage) => { const r = stage.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
 
-// ---- src/core/base-element.js ----
-class BaseElement {
-  constructor(type, x=10, y=10, w=20, h=10){
-    this.id = Editor.uid(type); this.type = type;
-    this.x=x; this.y=y; this.w=w; this.h=h;
-    this.rotation=0; this.z=1; this.lockRatio=false; this._ratio=w/h;
-    this.dom=null; this.selected=false;
-  }
-  createDom(){ throw new Error('createDom must be implemented'); }
-  mount(parent){ if(!this.dom) this.createDom(); parent.appendChild(this.dom); this.applyTransform(); this.attachInteractivity(); }
-  unmount(){ if(this.dom?.parentElement){ this.dom.parentElement.removeChild(this.dom); } }
-  applyTransform(){ if(!this.dom) return; this.z=Math.max(0, this.z|0); Object.assign(this.dom.style, { left:this.x+'%', top:this.y+'%', width:this.w+'%', height:this.h+'%', zIndex:this.z, position:'absolute' }); Editor.instance?.onElementChanged(); }
-  toJSON(){ return { id:this.id,type:this.type,x:this.x,y:this.y,w:this.w,h:this.h,rotation:this.rotation,z:this.z,lockRatio:this.lockRatio }; }
-  setSelected(sel){ this.selected=sel; if(!this.dom) return; this.dom.classList.toggle('selected',sel); if(sel){ this.ensureHandles(); } else { this.removeHandles(); } }
-  ensureHandles(){ if($('.handles',this.dom)) return; const box=document.createElement('div'); box.className='handles'; ['nw','n','ne','e','se','s','sw','w'].forEach(d=>{ const h=document.createElement('div'); h.dataset.dir=d; h.className=`handle ${d}`; h.dataset.editorUi='1'; box.appendChild(h);}); this.dom.appendChild(box);}    
-  removeHandles(){ $$('.handles',this.dom).forEach(n=>n.remove()); }
-  attachInteractivity(){
-    this.dom.addEventListener('mousedown',(e)=>{
-      if(e.target.classList.contains('handle')) return;
-      if(e.ctrlKey||e.metaKey||e.shiftKey) Editor.instance.toggleSelect(this); else Editor.instance.selectOnly(this);
-      const stage=Editor.instance.stageEl; const start=clientToStage(e, stage);
-      const {x:sx,y:sy}=this; const grid=Editor.instance.gridPct();
-      const onMove=(ev)=>{ const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
-        let nx=sx+dx, ny=sy+dy; nx=clamp(snapTo(nx,grid.x),0,100-this.w); ny=clamp(snapTo(ny,grid.y),0,100-this.h); this.x=nx; this.y=ny; this.applyTransform(); Editor.instance.reflectSelection(); };
-      const onUp=()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    });
-    this.dom.addEventListener('mousedown',(e)=>{
-      const h=e.target.closest('.handle'); if(!h) return; e.stopPropagation();
-      Editor.instance.selectInclude(this);
-      const dir=h.dataset.dir; const stage=Editor.instance.stageEl; const start=clientToStage(e, stage);
-      const sx=this.x, sy=this.y, sw=this.w, sh=this.h; const aspect=sw/sh; const grid=Editor.instance.gridPct();
-      const onMove=(ev)=>{
-        const p=clientToStage(ev, stage); const dx=pxToPct(p.x-start.x, stage.clientWidth); const dy=pxToPct(p.y-start.y, stage.clientHeight);
-        let nx=sx, ny=sy, nw=sw, nh=sh;
-        if(dir.includes('e')) nw = sw + dx;
-        if(dir.includes('s')) nh = sh + dy;
-        if(dir.includes('w')) { nx = sx + dx; nw = sw - dx; }
-        if(dir.includes('n')) { ny = sy + dy; nh = sh - dy; }
-        if(this.lockRatio){ if(dir==='e'||dir==='w') nh = nw / aspect; else if(dir==='n'||dir==='s') nw = nh * aspect; else { if(Math.abs(dx)>Math.abs(dy)){ nh = nw / aspect; } else { nw = nh * aspect; } } }
-        nw = Math.max(1, nw); nh = Math.max(1, nh);
-        nx = Math.max(0, Math.min(100-1, nx)); ny = Math.max(0, Math.min(100-1, ny));
-        if(nx+nw>100) nw = 100-nx; if(ny+nh>100) nh = 100-ny;
-        nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); nw = snapTo(nw, grid.x); nh = snapTo(nh, grid.y);
-        Object.assign(this,{x:nx,y:ny,w:nw,h:nh}); this.applyTransform(); Editor.instance.reflectSelection(); };
-      const onUp=()=>{ window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-      window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-    });
-  }
-  getPropSchema(){
-    return [
-      { key:'x', label:'X %', type:'number', min:0 },
-      { key:'y', label:'Y %', type:'number', min:0 },
-      { key:'w', label:'Larghezza %', type:'number', min:1 },
-      { key:'h', label:'Altezza %', type:'number', min:1 },
-      { key:'z', label:'Z-index', type:'number', min:0 },
-      { key:'lockRatio', label:'Blocca proporzioni', type:'checkbox' }
-    ];
-  }
-  readProps(){}
-}
-
-// ---- src/elements/LabelElement.js ----
-class LabelElement extends BaseElement{
-  constructor(){ super('label', 10,10,30,10); this.text='Etichetta'; this.fontSize=2.2; this.color='#ffffff'; this.align='left'; }
-  createDom(){ const el=document.createElement('div'); el.className='el el-label p-2'; el.dataset.type='label'; el.id=this.id; el.innerHTML = `<div class="content w-100 h-100 d-flex align-items-center">${this.text}</div>`; this.dom=el; this.readProps(); return el; }
-  getPropSchema(){ return [ ...super.getPropSchema(), {key:'text',label:'Testo',type:'textarea'}, {key:'fontSize',label:'Dimensione (vw)',type:'number',min:.5}, {key:'color',label:'Colore',type:'color'}, {key:'align',label:'Allineamento',type:'select',options:[['left','Sinistra'],['center','Centro'],['right','Destra']] } ]; }
-  readProps(){ const c=this.dom.querySelector('.content'); c.textContent=this.text; this.dom.style.color=this.color; this.dom.style.fontSize=this.fontSize+'vw'; c.style.justifyContent = this.align==='left'? 'flex-start' : this.align==='center'? 'center':'flex-end'; }
-}
-
-// ---- src/elements/ImageElement.js ----
-class ImageElement extends BaseElement{
-  constructor(){ super('image', 20,25,35,25); this.src=''; this.alt=''; this.fit='cover'; }
-  createDom(){ const el=document.createElement('div'); el.className='el el-image'; el.dataset.type='image'; el.id=this.id; el.innerHTML = `<img class="w-100 h-100" style="object-fit:${this.fit};" alt="">`; this.dom=el; this.readProps(); return el; }
-  getPropSchema(){ return [ ...super.getPropSchema(), {key:'src',label:'Sorgente (URL)',type:'text'}, {key:'alt',label:'Alt',type:'text'}, {key:'fit',label:'Adattamento',type:'select',options:[['cover','cover'],['contain','contain'],['fill','fill'],['none','none'],['scale-down','scale-down']]} ]; }
-  readProps(){ const img=this.dom.querySelector('img'); img.src=this.src; img.alt=this.alt; img.style.objectFit=this.fit; }
-}
-
-// ---- src/elements/TextBoxElement.js ----
-class TextBoxElement extends BaseElement{
-  constructor(){ super('textbox', 12,40,35,6); this.placeholder='Inserisci testo…'; this.name='campo'; this.align='left'; }
-  createDom(){ const el=document.createElement('div'); el.className='el el-textbox p-2'; el.dataset.type='textbox'; el.id=this.id; el.innerHTML = `<input class="form-control form-control-sm h-100" type="text" name="${this.name}" placeholder="${this.placeholder}" />`; this.dom=el; this.readProps(); return el; }
-  getPropSchema(){ return [ ...super.getPropSchema(), {key:'name',label:'Name',type:'text'}, {key:'placeholder',label:'Placeholder',type:'text'}, {key:'align',label:'Allineamento testo',type:'select',options:[['left','Sinistra'],['center','Centro'],['right','Destra']]} ]; }
-  readProps(){ const i=this.dom.querySelector('input'); i.name=this.name; i.placeholder=this.placeholder; i.style.textAlign=this.align; }
-}
-
-// ---- src/elements/CheckboxElement.js ----
-class CheckboxElement extends BaseElement{
-  constructor(){ super('checkbox', 12,50,25,5); this.label='Voce'; this.name='chk1'; this.checked=false; }
-  createDom(){ const el=document.createElement('div'); el.className='el el-checkbox'; el.dataset.type='checkbox'; el.id=this.id; el.innerHTML = `<div class="form-check"><input class="form-check-input" type="checkbox" id="${this.id}-in" name="${this.name}"><label class="form-check-label" for="${this.id}-in">${this.label}</label></div>`; this.dom=el; this.readProps(); return el; }
-  getPropSchema(){ return [ ...super.getPropSchema(), {key:'name',label:'Name',type:'text'}, {key:'label',label:'Etichetta',type:'text'}, {key:'checked',label:'Selezionato',type:'checkbox'} ]; }
-  readProps(){ const i=this.dom.querySelector('input'); const l=this.dom.querySelector('label'); i.name=this.name; i.checked=this.checked; l.textContent=this.label; l.setAttribute('for',`${this.id}-in`);}    
-}
-
-// ---- src/elements/RadioGroupElement.js ----
-class RadioGroupElement extends BaseElement{
-  constructor(){ super('radiogroup', 12,58,35,10); this.name='opt'; this.options=['A','B','C']; this.inline=false; }
-  createDom(){ const el=document.createElement('div'); el.className='el el-radio'; el.dataset.type='radiogroup'; el.id=this.id; el.innerHTML = `<div class="rg"></div>`; this.dom=el; this.readProps(); return el; }
-  getPropSchema(){ return [ ...super.getPropSchema(), {key:'name',label:'Name',type:'text'}, {key:'options',label:'Opzioni (separate da ;)',type:'text'}, {key:'inline',label:'Inline',type:'checkbox'} ]; }
-  readProps(){ const rg=this.dom.querySelector('.rg'); rg.innerHTML=''; this.options.forEach((opt,idx)=>{ const id=`${this.id}-r${idx}`; rg.insertAdjacentHTML('beforeend', `<div class="form-check ${this.inline?'form-check-inline':''}"><input class="form-check-input" type="radio" name="${this.name}" id="${id}" value="${opt}"><label class="form-check-label" for="${id}">${opt}</label></div>`); }); }
-}
-
-// ---- src/ui/dock-panel.js ----
-class DockPanel{
-  constructor(root, manager){
-    this.root=root; this.manager=manager; this.root.classList.add('dock-panel');
-    this.side = root.dataset.side || 'left';
-    this.title = root.dataset.title || (root.querySelector('h6')?.textContent?.trim() || 'Pannello');
-    this.root.dataset.side=this.side;
-    if(!this.root.hasAttribute('data-collapsed')) this.root.dataset.collapsed='0';
-    this.handle=document.createElement('button');
-    this.handle.type='button'; this.handle.className='panel-handle';
-    this.handle.innerHTML=`<span class="label">${this.title}</span>`;
-    this.handle.setAttribute('aria-expanded', this.root.dataset.collapsed==='0' ? 'true' : 'false');
-    this.root.appendChild(this.handle);
-    this.handle.addEventListener('click', ()=> this.toggle());
-  }
-  toggle(force){
-    const collapsed = this.root.dataset.collapsed==='1';
-    const next = force==null ? !collapsed : !!force;
-    this.root.dataset.collapsed = next ? '1' : '0';
-    this.handle.setAttribute('aria-expanded', (!next).toString());
-    if(this.manager) this.manager.ensureExclusive(this);
-    window.dispatchEvent(new Event('resize'));
-  }
-}
-
-// ---- src/ui/panel-manager.js ----
-class PanelManager{
-  constructor(){ this.panels=[]; document.querySelectorAll('.dock-panel').forEach(el=> this.panels.push(new DockPanel(el, this))); }
-  ensureExclusive(changed){
-    if(changed.side!=='left') return;
-    if(changed.root.dataset.collapsed==='0'){
-      this.panels.forEach(p=>{ if(p!==changed && p.side==='left'){ p.root.dataset.collapsed='1'; p.handle.setAttribute('aria-expanded','false'); } });
-    } else {
-      const anyOpen=this.panels.some(p=>p.side==='left' && p.root.dataset.collapsed==='0');
-      if(!anyOpen){ const firstLeft=this.panels.find(p=>p.side==='left'); if(firstLeft){ firstLeft.root.dataset.collapsed='0'; firstLeft.handle.setAttribute('aria-expanded','true'); } }
-    }
-  }
-}
-
-// ---- src/steps/step-models.js ----
-class Step{
-  constructor(name='Step', orient='landscape'){
-    this.id=Editor.uid('step'); this.name=name; this.orient=orient; this.bgUrl=''; this.items=[];
-    this._thumbNeedsUpdate=true; this._thumbEl=null;
-  }
-}
-class Category{
-  constructor(name='Categoria'){
-    this.id=Editor.uid('cat'); this.name=name; this.steps=[]; this.collapsed=false;
-  }
-}
-
-// ---- src/steps/step-manager.js ----
-class StepManager{
-  constructor(editor){ this.editor=editor; this.catsWrap=$('#stepsCats'); this.btnAddCat=$('#btnAddCat'); this.categories=[]; this.activeStep=null; this._thumbTimers=new Map(); this.init(); }
-  init(){
-    this.btnAddCat.addEventListener('click', ()=> this.addCategory());
-    const cat=this.addCategory('Predefinita');
-    const st=this.addStep(cat, 'Step 1');
-    this.setActive(st);
-  }
-  addCategory(name='Nuova categoria'){
-    const c=new Category(name); this.categories.push(c); this.render(); return c;
-  }
-  addStep(cat, name='Nuovo step'){
-    const s=new Step(name, this.editor.stageEl.dataset.orient||'landscape');
-    s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
-    cat.steps.push(s); this.render(); return s;
-  }
-  duplicateStep(cat, step){
-    const copy=new Step(step.name+" (copia)", step.orient); copy.bgUrl=step.bgUrl;
-    step.items.forEach(el=>{
-      const n=this.editor.createElementByType(el.type);
-      Object.assign(n, {x:el.x,y:el.y,w:el.w,h:el.h,z:el.z,rotation:el.rotation,lockRatio:el.lockRatio});
-      switch(el.type){
-        case 'label': Object.assign(n,{text:el.text,fontSize:el.fontSize,color:el.color,align:el.align}); break;
-        case 'image': Object.assign(n,{src:el.src,alt:el.alt,fit:el.fit}); break;
-        case 'textbox': Object.assign(n,{placeholder:el.placeholder,name:el.name,align:el.align}); break;
-        case 'checkbox': Object.assign(n,{label:el.label,name:el.name,checked:el.checked}); break;
-        case 'radiogroup': Object.assign(n,{name:el.name,options:[...el.options],inline:el.inline}); break;
+    // ---- src/core/base-element.js ----
+    class BaseElement {
+      constructor(type, x = 10, y = 10, w = 20, h = 10) {
+        this.id = Editor.uid(type); this.type = type;
+        this.x = x; this.y = y; this.w = w; this.h = h;
+        this.rotation = 0; this.z = 1; this.lockRatio = false; this._ratio = w / h;
+        this.dom = null; this.selected = false;
       }
-      copy.items.push(n);
-    });
-    const idx = cat.steps.indexOf(step);
-    cat.steps.splice(idx+1, 0, copy);
-    this.render();
-    return copy;
-  }
-  deleteStep(cat, step){
-    const idx=cat.steps.indexOf(step);
-    if(idx<0) return;
-    const wasActive = this.activeStep?.id===step.id;
-    cat.steps.splice(idx,1);
-    if(wasActive){
-      const next = cat.steps[idx] || cat.steps[idx-1] || this.categories.find(c=>c.steps.length)?.steps[0] || null;
-      if(next) this.setActive(next); else { this.activeStep=null; this.editor.loadStep(new Step('Vuoto')); }
+      createDom() { throw new Error('createDom must be implemented'); }
+      mount(parent) { if (!this.dom) this.createDom(); parent.appendChild(this.dom); this.applyTransform(); this.attachInteractivity(); }
+      unmount() { if (this.dom?.parentElement) { this.dom.parentElement.removeChild(this.dom); } }
+      applyTransform() { if (!this.dom) return; this.z = Math.max(0, this.z | 0); Object.assign(this.dom.style, { left: this.x + '%', top: this.y + '%', width: this.w + '%', height: this.h + '%', zIndex: this.z, position: 'absolute' }); Editor.instance?.onElementChanged(); }
+      toJSON() { return { id: this.id, type: this.type, x: this.x, y: this.y, w: this.w, h: this.h, rotation: this.rotation, z: this.z, lockRatio: this.lockRatio }; }
+      setSelected(sel) { this.selected = sel; if (!this.dom) return; this.dom.classList.toggle('selected', sel); if (sel) { this.ensureHandles(); } else { this.removeHandles(); } }
+      ensureHandles() { if ($('.handles', this.dom)) return; const box = document.createElement('div'); box.className = 'handles';['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(d => { const h = document.createElement('div'); h.dataset.dir = d; h.className = `handle ${d}`; h.dataset.editorUi = '1'; box.appendChild(h); }); this.dom.appendChild(box); }
+      removeHandles() { $$('.handles', this.dom).forEach(n => n.remove()); }
+      attachInteractivity() {
+        this.dom.addEventListener('mousedown', (e) => {
+          if (e.target.classList.contains('handle')) return;
+          if (e.ctrlKey || e.metaKey || e.shiftKey) Editor.instance.toggleSelect(this); else Editor.instance.selectOnly(this);
+          const stage = Editor.instance.stageEl; const start = clientToStage(e, stage);
+          const { x: sx, y: sy } = this; const grid = Editor.instance.gridPct();
+          const onMove = (ev) => {
+            const p = clientToStage(ev, stage); const dx = pxToPct(p.x - start.x, stage.clientWidth); const dy = pxToPct(p.y - start.y, stage.clientHeight);
+            let nx = sx + dx, ny = sy + dy; nx = clamp(snapTo(nx, grid.x), 0, 100 - this.w); ny = clamp(snapTo(ny, grid.y), 0, 100 - this.h); this.x = nx; this.y = ny; this.applyTransform(); Editor.instance.reflectSelection();
+          };
+          const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+          window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+        });
+        this.dom.addEventListener('mousedown', (e) => {
+          const h = e.target.closest('.handle'); if (!h) return; e.stopPropagation();
+          Editor.instance.selectInclude(this);
+          const dir = h.dataset.dir; const stage = Editor.instance.stageEl; const start = clientToStage(e, stage);
+          const sx = this.x, sy = this.y, sw = this.w, sh = this.h; const aspect = sw / sh; const grid = Editor.instance.gridPct();
+          const onMove = (ev) => {
+            const p = clientToStage(ev, stage); const dx = pxToPct(p.x - start.x, stage.clientWidth); const dy = pxToPct(p.y - start.y, stage.clientHeight);
+            let nx = sx, ny = sy, nw = sw, nh = sh;
+            if (dir.includes('e')) nw = sw + dx;
+            if (dir.includes('s')) nh = sh + dy;
+            if (dir.includes('w')) { nx = sx + dx; nw = sw - dx; }
+            if (dir.includes('n')) { ny = sy + dy; nh = sh - dy; }
+            if (this.lockRatio) { if (dir === 'e' || dir === 'w') nh = nw / aspect; else if (dir === 'n' || dir === 's') nw = nh * aspect; else { if (Math.abs(dx) > Math.abs(dy)) { nh = nw / aspect; } else { nw = nh * aspect; } } }
+            nw = Math.max(1, nw); nh = Math.max(1, nh);
+            nx = Math.max(0, Math.min(100 - 1, nx)); ny = Math.max(0, Math.min(100 - 1, ny));
+            if (nx + nw > 100) nw = 100 - nx; if (ny + nh > 100) nh = 100 - ny;
+            nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); nw = snapTo(nw, grid.x); nh = snapTo(nh, grid.y);
+            Object.assign(this, { x: nx, y: ny, w: nw, h: nh }); this.applyTransform(); Editor.instance.reflectSelection();
+          };
+          const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+          window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+        });
+      }
+      getPropSchema() {
+        return [
+          { key: 'x', label: 'X %', type: 'number', min: 0 },
+          { key: 'y', label: 'Y %', type: 'number', min: 0 },
+          { key: 'w', label: 'Larghezza %', type: 'number', min: 1 },
+          { key: 'h', label: 'Altezza %', type: 'number', min: 1 },
+          { key: 'z', label: 'Z-index', type: 'number', min: 0 },
+          { key: 'lockRatio', label: 'Blocca proporzioni', type: 'checkbox' }
+        ];
+      }
+      readProps() { }
     }
-    this.render();
-  }
-  setActive(step){ if(!step) return; this.activeStep=step; this.editor.loadStep(step); this.render(); }
-  scheduleThumb(step){ clearTimeout(this._thumbTimers.get(step?.id)); const t=setTimeout(()=>{ step._thumbNeedsUpdate=true; this.render(); }, 250); this._thumbTimers.set(step?.id, t); }
 
-  render(){
-    this.catsWrap.innerHTML='';
-    this.categories.forEach(cat=>{
-      const catEl=document.createElement('div'); catEl.className='cat'; catEl.dataset.catId=cat.id;
-      const head=document.createElement('div'); head.className='cat-head';
-      const title=document.createElement('div'); title.className='cat-title'; title.textContent=cat.name; title.title='Doppio clic per rinominare';
-      title.addEventListener('dblclick', ()=> this.renameCategory(cat, title));
-      const actions=document.createElement('div'); actions.className='cat-actions';
-      const btnToggle=document.createElement('button'); btnToggle.className='btn btn-outline-light btn-sm'; btnToggle.textContent = cat.collapsed?'▶':'▼'; btnToggle.title='Espandi/Collassa'; btnToggle.addEventListener('click', ()=>{ cat.collapsed=!cat.collapsed; this.render(); });
-      actions.appendChild(btnToggle);
-      head.appendChild(title); head.appendChild(actions); catEl.appendChild(head);
-      const body=document.createElement('div'); body.className='cat-body'; body.style.display=cat.collapsed?'none':'block';
-      const list=document.createElement('div'); list.className='thumbs';
-      cat.steps.forEach((step,idx)=> list.appendChild(this.buildThumb(step, idx+1, cat)) );
-      const add=document.createElement('div'); add.className='thumb add'; add.innerHTML=`<div class="mini"></div><div class="label"><span>Nuovo step</span></div>`; add.addEventListener('click', ()=>{ const s=this.addStep(cat, `Step ${cat.steps.length+1}`); this.setActive(s); });
-      list.appendChild(add);
-      body.appendChild(list); catEl.appendChild(body);
-      this.catsWrap.appendChild(catEl);
-    });
-  }
-
-  renameCategory(cat, titleEl){
-    const input=document.createElement('input'); input.type='text'; input.value=cat.name; input.className='rename-input';
-    titleEl.replaceWith(input); input.focus(); input.select();
-    const commit=()=>{ cat.name=input.value.trim()||cat.name; this.render(); };
-    input.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); commit(); } else if(e.key==='Escape'){ this.render(); } });
-    input.addEventListener('blur', commit);
-  }
-
-  buildThumb(step, index, cat){
-    if(step._thumbEl && !step._thumbNeedsUpdate){
-      const el=step._thumbEl; el.classList.toggle('active', this.activeStep?.id===step.id); el.querySelector('._num').textContent=index; return el;
+    // ---- src/elements/LabelElement.js ----
+    class LabelElement extends BaseElement {
+      constructor() { super('label', 10, 10, 30, 10); this.text = 'Etichetta'; this.fontSize = 2.2; this.color = '#ffffff'; this.align = 'left'; }
+      createDom() { const el = document.createElement('div'); el.className = 'el el-label p-2'; el.dataset.type = 'label'; el.id = this.id; el.innerHTML = `<div class="content w-100 h-100 d-flex align-items-center">${this.text}</div>`; this.dom = el; this.readProps(); return el; }
+      getPropSchema() { return [...super.getPropSchema(), { key: 'text', label: 'Testo', type: 'textarea' }, { key: 'fontSize', label: 'Dimensione (vw)', type: 'number', min: .5 }, { key: 'color', label: 'Colore', type: 'color' }, { key: 'align', label: 'Allineamento', type: 'select', options: [['left', 'Sinistra'], ['center', 'Centro'], ['right', 'Destra']] }]; }
+      readProps() { const c = this.dom.querySelector('.content'); c.textContent = this.text; this.dom.style.color = this.color; this.dom.style.fontSize = this.fontSize + 'vw'; c.style.justifyContent = this.align === 'left' ? 'flex-start' : this.align === 'center' ? 'center' : 'flex-end'; }
     }
-    const el=document.createElement('div'); el.className='thumb'; el.dataset.stepId=step.id; el.dataset.orient= step.orient==='portrait' ? 'portrait':'landscape';
-    el.innerHTML = `<div class="mini"><div class="mini-canvas"></div></div>
+
+    // ---- src/elements/ImageElement.js ----
+    class ImageElement extends BaseElement {
+      constructor() { super('image', 20, 25, 35, 25); this.src = ''; this.alt = ''; this.fit = 'cover'; }
+      createDom() { const el = document.createElement('div'); el.className = 'el el-image'; el.dataset.type = 'image'; el.id = this.id; el.innerHTML = `<img class="w-100 h-100" style="object-fit:${this.fit};" alt="">`; this.dom = el; this.readProps(); return el; }
+      getPropSchema() { return [...super.getPropSchema(), { key: 'src', label: 'Sorgente (URL)', type: 'text' }, { key: 'alt', label: 'Alt', type: 'text' }, { key: 'fit', label: 'Adattamento', type: 'select', options: [['cover', 'cover'], ['contain', 'contain'], ['fill', 'fill'], ['none', 'none'], ['scale-down', 'scale-down']] }]; }
+      readProps() { const img = this.dom.querySelector('img'); img.src = this.src; img.alt = this.alt; img.style.objectFit = this.fit; }
+    }
+
+    // ---- src/elements/TextBoxElement.js ----
+    class TextBoxElement extends BaseElement {
+      constructor() { super('textbox', 12, 40, 35, 6); this.placeholder = 'Inserisci testo…'; this.name = 'campo'; this.align = 'left'; }
+      createDom() { const el = document.createElement('div'); el.className = 'el el-textbox p-2'; el.dataset.type = 'textbox'; el.id = this.id; el.innerHTML = `<input class="form-control form-control-sm h-100" type="text" name="${this.name}" placeholder="${this.placeholder}" />`; this.dom = el; this.readProps(); return el; }
+      getPropSchema() { return [...super.getPropSchema(), { key: 'name', label: 'Name', type: 'text' }, { key: 'placeholder', label: 'Placeholder', type: 'text' }, { key: 'align', label: 'Allineamento testo', type: 'select', options: [['left', 'Sinistra'], ['center', 'Centro'], ['right', 'Destra']] }]; }
+      readProps() { const i = this.dom.querySelector('input'); i.name = this.name; i.placeholder = this.placeholder; i.style.textAlign = this.align; }
+    }
+
+    // ---- src/elements/CheckboxElement.js ----
+    class CheckboxElement extends BaseElement {
+      constructor() { super('checkbox', 12, 50, 25, 5); this.label = 'Voce'; this.name = 'chk1'; this.checked = false; }
+      createDom() { const el = document.createElement('div'); el.className = 'el el-checkbox'; el.dataset.type = 'checkbox'; el.id = this.id; el.innerHTML = `<div class="form-check"><input class="form-check-input" type="checkbox" id="${this.id}-in" name="${this.name}"><label class="form-check-label" for="${this.id}-in">${this.label}</label></div>`; this.dom = el; this.readProps(); return el; }
+      getPropSchema() { return [...super.getPropSchema(), { key: 'name', label: 'Name', type: 'text' }, { key: 'label', label: 'Etichetta', type: 'text' }, { key: 'checked', label: 'Selezionato', type: 'checkbox' }]; }
+      readProps() { const i = this.dom.querySelector('input'); const l = this.dom.querySelector('label'); i.name = this.name; i.checked = this.checked; l.textContent = this.label; l.setAttribute('for', `${this.id}-in`); }
+    }
+
+    // ---- src/elements/RadioGroupElement.js ----
+    class RadioGroupElement extends BaseElement {
+      constructor() { super('radiogroup', 12, 58, 35, 10); this.name = 'opt'; this.options = ['A', 'B', 'C']; this.inline = false; }
+      createDom() { const el = document.createElement('div'); el.className = 'el el-radio'; el.dataset.type = 'radiogroup'; el.id = this.id; el.innerHTML = `<div class="rg"></div>`; this.dom = el; this.readProps(); return el; }
+      getPropSchema() { return [...super.getPropSchema(), { key: 'name', label: 'Name', type: 'text' }, { key: 'options', label: 'Opzioni (separate da ;)', type: 'text' }, { key: 'inline', label: 'Inline', type: 'checkbox' }]; }
+      readProps() { const rg = this.dom.querySelector('.rg'); rg.innerHTML = ''; this.options.forEach((opt, idx) => { const id = `${this.id}-r${idx}`; rg.insertAdjacentHTML('beforeend', `<div class="form-check ${this.inline ? 'form-check-inline' : ''}"><input class="form-check-input" type="radio" name="${this.name}" id="${id}" value="${opt}"><label class="form-check-label" for="${id}">${opt}</label></div>`); }); }
+    }
+
+    // ---- src/ui/dock-panel.js ----
+    class DockPanel {
+      constructor(root, manager) {
+        this.root = root; this.manager = manager; this.root.classList.add('dock-panel');
+        this.side = root.dataset.side || 'left';
+        this.title = root.dataset.title || (root.querySelector('h6')?.textContent?.trim() || 'Pannello');
+        this.root.dataset.side = this.side;
+        if (!this.root.hasAttribute('data-collapsed')) this.root.dataset.collapsed = '0';
+        this.handle = document.createElement('button');
+        this.handle.type = 'button'; this.handle.className = 'panel-handle';
+        this.handle.innerHTML = `<span class="label">${this.title}</span>`;
+        this.handle.setAttribute('aria-expanded', this.root.dataset.collapsed === '0' ? 'true' : 'false');
+        this.root.appendChild(this.handle);
+        this.handle.addEventListener('click', () => this.toggle());
+      }
+      toggle(force) {
+        const collapsed = this.root.dataset.collapsed === '1';
+        const next = force == null ? !collapsed : !!force;
+        this.root.dataset.collapsed = next ? '1' : '0';
+        this.handle.setAttribute('aria-expanded', (!next).toString());
+        if (this.manager) this.manager.ensureExclusive(this);
+        window.dispatchEvent(new Event('resize'));
+      }
+    }
+
+    // ---- src/ui/panel-manager.js ----
+    class PanelManager {
+      constructor() { this.panels = []; document.querySelectorAll('.dock-panel').forEach(el => this.panels.push(new DockPanel(el, this))); }
+      ensureExclusive(changed) {
+        if (changed.side !== 'left') return;
+        if (changed.root.dataset.collapsed === '0') {
+          this.panels.forEach(p => { if (p !== changed && p.side === 'left') { p.root.dataset.collapsed = '1'; p.handle.setAttribute('aria-expanded', 'false'); } });
+        } else {
+          const anyOpen = this.panels.some(p => p.side === 'left' && p.root.dataset.collapsed === '0');
+          if (!anyOpen) { const firstLeft = this.panels.find(p => p.side === 'left'); if (firstLeft) { firstLeft.root.dataset.collapsed = '0'; firstLeft.handle.setAttribute('aria-expanded', 'true'); } }
+        }
+      }
+    }
+
+    // ---- src/steps/step-models.js ----
+    class Step {
+      constructor(name = 'Step', orient = 'landscape') {
+        this.id = Editor.uid('step'); this.name = name; this.orient = orient; this.bgUrl = ''; this.items = [];
+        this._thumbNeedsUpdate = true; this._thumbEl = null;
+      }
+    }
+    class Category {
+      constructor(name = 'Categoria') {
+        this.id = Editor.uid('cat'); this.name = name; this.steps = []; this.collapsed = false;
+      }
+    }
+
+    // ---- src/steps/step-manager.js ----
+    class StepManager {
+      constructor(editor) { this.editor = editor; this.catsWrap = $('#stepsCats'); this.btnAddCat = $('#btnAddCat'); this.categories = []; this.activeStep = null; this._thumbTimers = new Map(); this.init(); }
+      init() {
+        this.btnAddCat.addEventListener('click', () => this.addCategory());
+        const cat = this.addCategory('Predefinita');
+        const st = this.addStep(cat, 'Step 1');
+        this.setActive(st);
+      }
+      addCategory(name = 'Nuova categoria') {
+        const c = new Category(name); this.categories.push(c); this.render(); return c;
+      }
+      addStep(cat, name = 'Nuovo step') {
+        const s = new Step(name, this.editor.stageEl.dataset.orient || 'landscape');
+        s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
+        cat.steps.push(s); this.render(); return s;
+      }
+      duplicateStep(cat, step) {
+        const copy = new Step(step.name + " (copia)", step.orient); copy.bgUrl = step.bgUrl;
+        step.items.forEach(el => {
+          const n = this.editor.createElementByType(el.type);
+          Object.assign(n, { x: el.x, y: el.y, w: el.w, h: el.h, z: el.z, rotation: el.rotation, lockRatio: el.lockRatio });
+          switch (el.type) {
+            case 'label': Object.assign(n, { text: el.text, fontSize: el.fontSize, color: el.color, align: el.align }); break;
+            case 'image': Object.assign(n, { src: el.src, alt: el.alt, fit: el.fit }); break;
+            case 'textbox': Object.assign(n, { placeholder: el.placeholder, name: el.name, align: el.align }); break;
+            case 'checkbox': Object.assign(n, { label: el.label, name: el.name, checked: el.checked }); break;
+            case 'radiogroup': Object.assign(n, { name: el.name, options: [...el.options], inline: el.inline }); break;
+          }
+          copy.items.push(n);
+        });
+        const idx = cat.steps.indexOf(step);
+        cat.steps.splice(idx + 1, 0, copy);
+        this.render();
+        return copy;
+      }
+      deleteStep(cat, step) {
+        const idx = cat.steps.indexOf(step);
+        if (idx < 0) return;
+        const wasActive = this.activeStep?.id === step.id;
+        cat.steps.splice(idx, 1);
+        if (wasActive) {
+          const next = cat.steps[idx] || cat.steps[idx - 1] || this.categories.find(c => c.steps.length)?.steps[0] || null;
+          if (next) this.setActive(next); else { this.activeStep = null; this.editor.loadStep(new Step('Vuoto')); }
+        }
+        this.render();
+      }
+      setActive(step) { if (!step) return; this.activeStep = step; this.editor.loadStep(step); this.render(); }
+      scheduleThumb(step) { clearTimeout(this._thumbTimers.get(step?.id)); const t = setTimeout(() => { step._thumbNeedsUpdate = true; this.render(); }, 250); this._thumbTimers.set(step?.id, t); }
+
+      render() {
+        this.catsWrap.innerHTML = '';
+        this.categories.forEach(cat => {
+          const catEl = document.createElement('div'); catEl.className = 'cat'; catEl.dataset.catId = cat.id;
+          const head = document.createElement('div'); head.className = 'cat-head';
+          const title = document.createElement('div'); title.className = 'cat-title'; title.textContent = cat.name; title.title = 'Doppio clic per rinominare';
+          title.addEventListener('dblclick', () => this.renameCategory(cat, title));
+          const actions = document.createElement('div'); actions.className = 'cat-actions';
+          const btnToggle = document.createElement('button'); btnToggle.className = 'btn btn-outline-light btn-sm'; btnToggle.textContent = cat.collapsed ? '▶' : '▼'; btnToggle.title = 'Espandi/Collassa'; btnToggle.addEventListener('click', () => { cat.collapsed = !cat.collapsed; this.render(); });
+          actions.appendChild(btnToggle);
+          head.appendChild(title); head.appendChild(actions); catEl.appendChild(head);
+          const body = document.createElement('div'); body.className = 'cat-body'; body.style.display = cat.collapsed ? 'none' : 'block';
+          const list = document.createElement('div'); list.className = 'thumbs';
+          cat.steps.forEach((step, idx) => list.appendChild(this.buildThumb(step, idx + 1, cat)));
+          const add = document.createElement('div'); add.className = 'thumb add'; add.innerHTML = `<div class="mini"></div><div class="label"><span>Nuovo step</span></div>`; add.addEventListener('click', () => { const s = this.addStep(cat, `Step ${cat.steps.length + 1}`); this.setActive(s); });
+          list.appendChild(add);
+          body.appendChild(list); catEl.appendChild(body);
+          this.catsWrap.appendChild(catEl);
+        });
+      }
+
+      renameCategory(cat, titleEl) {
+        const input = document.createElement('input'); input.type = 'text'; input.value = cat.name; input.className = 'rename-input';
+        titleEl.replaceWith(input); input.focus(); input.select();
+        const commit = () => { cat.name = input.value.trim() || cat.name; this.render(); };
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { this.render(); } });
+        input.addEventListener('blur', commit);
+      }
+
+      buildThumb(step, index, cat) {
+        if (step._thumbEl && !step._thumbNeedsUpdate) {
+          const el = step._thumbEl; el.classList.toggle('active', this.activeStep?.id === step.id); el.querySelector('._num').textContent = index; return el;
+        }
+        const el = document.createElement('div'); el.className = 'thumb'; el.dataset.stepId = step.id; el.dataset.orient = step.orient === 'portrait' ? 'portrait' : 'landscape';
+        el.innerHTML = `<div class="mini"><div class="mini-canvas"></div></div>
       <div class="label">
         <div class="title"><span class="badge text-bg-secondary _num">${index}</span><span class="_name">${step.name}</span></div>
         <div class="actions">
@@ -442,183 +789,192 @@ class StepManager{
           <button class="btn-icon _del"  title="Elimina" type="button">🗑</button>
         </div>
       </div>`;
-    el.addEventListener('click', (ev)=>{ if(ev.target.closest('.actions')) return; this.setActive(step); });
-    if(this.activeStep?.id===step.id) el.classList.add('active');
-    const mc=el.querySelector('.mini-canvas');
-    mc.innerHTML='';
-    mc.style.background = step.bgUrl ? `center/cover no-repeat url('${step.bgUrl}')` : '';
-    step.items.forEach(it=>{
-      const box=document.createElement('div');
-      box.style.position='absolute'; box.style.left=it.x+'%'; box.style.top=it.y+'%'; box.style.width=it.w+'%'; box.style.height=it.h+'%';
-      box.style.border='1px solid rgba(255,255,255,.35)'; box.style.borderRadius='2px'; box.style.background='rgba(255,255,255,.04)';
-      mc.appendChild(box);
-    });
-    el.querySelector('._dup').addEventListener('click', (e)=>{ e.stopPropagation(); const cp=this.duplicateStep(cat, step); this.setActive(cp); });
-    el.querySelector('._del').addEventListener('click', (e)=>{ e.stopPropagation(); const btn=e.currentTarget; if(!btn._armed){ btn._armed=true; const orig=btn.textContent; btn.textContent='✔'; btn.title='Conferma elimina'; btn.classList.add('text-danger'); setTimeout(()=>{ btn._armed=false; btn.textContent=orig; btn.title='Elimina'; btn.classList.remove('text-danger'); }, 2000); } else { this.deleteStep(cat, step); } });
-    el.querySelector('._save').addEventListener('click', (e)=>{ e.stopPropagation(); console.log('TODO: save step', step); });
-    step._thumbEl=el; step._thumbNeedsUpdate=false; return el;
-  }
-}
-
-// ---- src/editor/editor.js ----
-class Editor{
-  static instance;
-  static uid = (p)=> _uid(p);
-  constructor(){
-    if(Editor.instance) return Editor.instance; Editor.instance=this;
-    this.palette=$('#palette'); this.stageEl=$('#stage'); this.stageSize=$('.stage-size'); this.canvas=$('#stepCanvas'); this.propForm=$('#propForm');
-    this.elements=[]; this.selected=[]; this.grid=16; this.subgrid=false; this._thumbDebounce=null;
-    this.initUI(); this.initKeyboard(); this.seedPalette(); this.layoutStage(); window.addEventListener('resize', ()=>this.layoutStage());
-    this.stepMgr=new StepManager(this);
-    this.panelMgr=new PanelManager();
-    window.__editor__ = this;
-  }
-  layoutStage(){
-    const outer = this.stageEl.parentElement;
-    const cs = getComputedStyle(outer);
-    const pt = parseFloat(cs.paddingTop)||0, pb = parseFloat(cs.paddingBottom)||0;
-    const pl = parseFloat(cs.paddingLeft)||0, pr = parseFloat(cs.paddingRight)||0;
-    const cw = outer.clientWidth - pl - pr; const ch = outer.clientHeight - pt - pb;
-    const orient = this.stageEl.dataset.orient || 'landscape';
-    const R = (orient==='portrait') ? (9/16) : (16/9);
-    let w = Math.min(cw, Math.floor(ch * R)); let h = Math.floor(w / R);
-    if(h > ch){ h = ch; w = Math.floor(h * R); } if(w > cw){ w = cw; h = Math.floor(w / R); }
-    Object.assign(this.stageEl.style, { width: w + 'px', height: h + 'px' });
-  }
-  gridPct(){ const sx=this.stageEl.clientWidth, sy=this.stageEl.clientHeight; const g=this.grid; if(!g) return {x:0,y:0}; return { x: pxToPct(g, sx), y: pxToPct(g, sy) }; }
-  initUI(){
-    this.propForm.addEventListener('submit', (e)=> e.preventDefault()); this.propForm.setAttribute('novalidate','novalidate');
-    $('#orientLandscape').addEventListener('change', ()=>{ if($('#orientLandscape').checked){ this.changeOrientation('landscape'); }});
-    $('#orientPortrait').addEventListener('change', ()=>{ if($('#orientPortrait').checked){ this.changeOrientation('portrait'); }});
-    const range=$('#gridRange'), val=$('#gridVal');
-    const setGrid=(g)=>{ this.grid=Number(g); val.textContent = g==0?'off': g+"px"; this.stageEl.style.setProperty('--grid', (g||8)+"px"); this.stageEl.dataset.grid = g==0? 'off':'on'; };
-    range.addEventListener('input', e=> setGrid(e.target.value)); setGrid(range.value);
-    $('#subgridSwitch').addEventListener('change', e=>{ this.subgrid=e.target.checked; this.stageEl.dataset.subgrid = this.subgrid? 'on':'off'; });
-    $('#setBg').addEventListener('click', ()=>{ const url=$('#bgUrl').value.trim(); this.setBackground(url); });
-    this.stageEl.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-    this.stageEl.addEventListener('drop', (e)=>{ e.preventDefault(); const type=e.dataTransfer.getData('text/plain'); const el=this.createElementByType(type); if(!el) return; const p=clientToStage(e,this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth)/2, this.stageEl.clientWidth),0,100-el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight)/2, this.stageEl.clientHeight),0,100-el.h); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
-    this.stageEl.addEventListener('mousedown', (e)=>{ if(e.target===this.stageEl || e.target===this.canvas || e.target.classList.contains('stage-size')){ if(!e.shiftKey&&!e.ctrlKey) this.clearSelection();
-        const start=clientToStage(e,this.stageEl); const mq=$('#marquee'); mq.classList.remove('d-none'); Object.assign(mq.style,{left:start.x+'px',top:start.y+'px',width:0,height:0});
-        const onMove=(ev)=>{ const p=clientToStage(ev,this.stageEl); const x=Math.min(start.x,p.x), y=Math.min(start.y,p.y), w=Math.abs(p.x-start.x), h=Math.abs(p.y-start.y); Object.assign(mq.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
-          const rx={l:pxToPct(x,this.stageEl.clientWidth), t:pxToPct(y,this.stageEl.clientHeight), r:pxToPct(x+w,this.stageEl.clientWidth), b:pxToPct(y+h,this.stageEl.clientHeight)};
-          this.elements.forEach(el=>{ const ex={l:el.x, t:el.y, r:el.x+el.w, b:el.y+el.h}; const hit= !(ex.l>rx.r||ex.r<rx.l||ex.t>rx.b||ex.b<rx.t); el.setSelected(hit); if(hit && !this.selected.includes(el)) this.selected.push(el); }); };
-        const onUp=()=>{ mq.classList.add('d-none'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp)};
-        window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-      }});
-    $('#btnExportHtml').addEventListener('click', ()=> this.exportHTML());
-    $$('[data-cmd]').forEach(b=> b.addEventListener('click', ()=> this.execCommand(b.dataset.cmd)) );
-  }
-  initKeyboard(){
-    window.addEventListener('keydown',(e)=>{
-      if(!this.selected.length) return;
-      const isArrow=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key);
-      if(isArrow || e.key==='Delete') e.preventDefault();
-      const stepX = e.shiftKey ? (this.gridPct().x || pxToPct(8,this.stageEl.clientWidth)) : pxToPct(1, this.stageEl.clientWidth);
-      const stepY = e.shiftKey ? (this.gridPct().y || pxToPct(8,this.stageEl.clientHeight)) : pxToPct(1, this.stageEl.clientHeight);
-      const useSnap = e.shiftKey;
-      switch(e.key){
-        case 'Delete': this.deleteSelected(); break;
-        case 'ArrowLeft':  this.nudge(-stepX, 0, {snap:useSnap}); break;
-        case 'ArrowRight': this.nudge( stepX, 0, {snap:useSnap}); break;
-        case 'ArrowUp':    this.nudge( 0, -stepY, {snap:useSnap}); break;
-        case 'ArrowDown':  this.nudge( 0,  stepY, {snap:useSnap}); break;
+        el.addEventListener('click', (ev) => { if (ev.target.closest('.actions')) return; this.setActive(step); });
+        if (this.activeStep?.id === step.id) el.classList.add('active');
+        const mc = el.querySelector('.mini-canvas');
+        mc.innerHTML = '';
+        mc.style.background = step.bgUrl ? `center/cover no-repeat url('${step.bgUrl}')` : '';
+        step.items.forEach(it => {
+          const box = document.createElement('div');
+          box.style.position = 'absolute'; box.style.left = it.x + '%'; box.style.top = it.y + '%'; box.style.width = it.w + '%'; box.style.height = it.h + '%';
+          box.style.border = '1px solid rgba(255,255,255,.35)'; box.style.borderRadius = '2px'; box.style.background = 'rgba(255,255,255,.04)';
+          mc.appendChild(box);
+        });
+        el.querySelector('._dup').addEventListener('click', (e) => { e.stopPropagation(); const cp = this.duplicateStep(cat, step); this.setActive(cp); });
+        el.querySelector('._del').addEventListener('click', (e) => { e.stopPropagation(); const btn = e.currentTarget; if (!btn._armed) { btn._armed = true; const orig = btn.textContent; btn.textContent = '✔'; btn.title = 'Conferma elimina'; btn.classList.add('text-danger'); setTimeout(() => { btn._armed = false; btn.textContent = orig; btn.title = 'Elimina'; btn.classList.remove('text-danger'); }, 2000); } else { this.deleteStep(cat, step); } });
+        el.querySelector('._save').addEventListener('click', (e) => { e.stopPropagation(); console.log('TODO: save step', step); });
+        step._thumbEl = el; step._thumbNeedsUpdate = false; return el;
       }
-    }, true);
-  }
-  onElementChanged(){ if(!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce=setTimeout(()=> this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
-  nudge(dx,dy,opts={snap:false}){
-    const grid=this.gridPct();
-    this.selected.forEach(el=>{
-      let nx=el.x+dx, ny=el.y+dy;
-      if(opts.snap){ nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); }
-      nx = Math.max(0, Math.min(100-el.w, nx));
-      ny = Math.max(0, Math.min(100-el.h, ny));
-      el.x=nx; el.y=ny; el.applyTransform();
-    });
-    this.reflectSelection();
-  }
-  seedPalette(){
-    const items=[ 
-      {type:'label',title:'Etichetta di testo',klass:LabelElement}, 
-      {type:'image',title:'Immagine',klass:ImageElement}, 
-      {type:'textbox',title:'Casella di testo',klass:TextBoxElement}, 
-      {type:'checkbox',title:'Checkbox',klass:CheckboxElement}, 
-      {type:'radiogroup',title:'Opzioni (radio)',klass:RadioGroupElement} 
-    ];
-    this.registry=new Map(items.map(i=>[i.type,i]));
-    items.forEach(i=>{ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable=true; b.dataset.type=i.type; b.innerHTML=`<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart',(e)=> e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', ()=>{ const el=this.createElementByType(i.type); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); this.palette.appendChild(b); });
-  }
-  createElementByType(type){ const meta=this.registry.get(type); return meta? new meta.klass():null; }
-  clearSelection(){ this.selected.forEach(e=>e.setSelected(false)); this.selected=[]; this.renderPropPanel(); }
-  toggleSelect(el){ const i=this.selected.indexOf(el); if(i>=0){ this.selected.splice(i,1); el.setSelected(false);} else { this.selected.push(el); el.setSelected(true);} this.renderPropPanel(); }
-  selectOnly(el){ this.clearSelection(); if(el){ this.selected=[el]; el.setSelected(true);} this.renderPropPanel(); }
-  selectInclude(el){ if(!this.selected.includes(el)) this.selected.push(el); el.setSelected(true); this.renderPropPanel(); }
-  reflectSelection(){ if(this.selected.length!==1) { this.renderPropPanel(); return; } const sel=this.selected[0]; $$('#propForm [data-prop]').forEach(inp=>{ const k=inp.dataset.prop; if(['x','y','w','h','z','fontSize'].includes(k)) inp.value= sel[k]; if(k==='lockRatio') inp.checked=!!sel.lockRatio; }); }
-  deleteSelected(){ this.selected.forEach(s=>{ s.dom.remove(); this.elements=this.elements.filter(e=>e!==s); }); this.clearSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
-  renderPropPanel(){ const f=this.propForm; f.innerHTML='';
-    if(!this.selected.length){
-      const step=this.stepMgr?.activeStep; if(!step){ f.innerHTML='<div class="text-secondary small">Nessuno step attivo</div>'; return; }
-      const wrap=document.createElement('div');
-      wrap.innerHTML=`<div class="mb-2"><label class="form-label small">Titolo step</label><input id="stepName" class="form-control form-control-sm" type="text" value="${step.name}"></div>
+    }
+
+    // ---- src/editor/editor.js ----
+    class Editor {
+      static instance;
+      static uid = (p) => _uid(p);
+      constructor() {
+        if (Editor.instance) return Editor.instance; Editor.instance = this;
+        this.palette = $('#palette'); this.stageEl = $('#stage'); this.stageSize = $('.stage-size'); this.canvas = $('#stepCanvas'); this.propForm = $('#propForm');
+        this.elements = []; this.selected = []; this.grid = 16; this.subgrid = false; this._thumbDebounce = null;
+        this.initUI(); this.initKeyboard(); this.seedPalette(); this.layoutStage(); window.addEventListener('resize', () => this.layoutStage());
+        this.stepMgr = new StepManager(this);
+        this.panelMgr = new PanelManager();
+        window.__editor__ = this;
+      }
+      layoutStage() {
+        const outer = this.stageEl.parentElement;
+        const cs = getComputedStyle(outer);
+        const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+        const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+        const cw = outer.clientWidth - pl - pr; const ch = outer.clientHeight - pt - pb;
+        const orient = this.stageEl.dataset.orient || 'landscape';
+        const R = (orient === 'portrait') ? (9 / 16) : (16 / 9);
+        let w = Math.min(cw, Math.floor(ch * R)); let h = Math.floor(w / R);
+        if (h > ch) { h = ch; w = Math.floor(h * R); } if (w > cw) { w = cw; h = Math.floor(w / R); }
+        Object.assign(this.stageEl.style, { width: w + 'px', height: h + 'px' });
+      }
+      gridPct() { const sx = this.stageEl.clientWidth, sy = this.stageEl.clientHeight; const g = this.grid; if (!g) return { x: 0, y: 0 }; return { x: pxToPct(g, sx), y: pxToPct(g, sy) }; }
+      initUI() {
+        this.propForm.addEventListener('submit', (e) => e.preventDefault()); this.propForm.setAttribute('novalidate', 'novalidate');
+        $('#orientLandscape').addEventListener('change', () => { if ($('#orientLandscape').checked) { this.changeOrientation('landscape'); } });
+        $('#orientPortrait').addEventListener('change', () => { if ($('#orientPortrait').checked) { this.changeOrientation('portrait'); } });
+        const range = $('#gridRange'), val = $('#gridVal');
+        const setGrid = (g) => { this.grid = Number(g); val.textContent = g == 0 ? 'off' : g + "px"; this.stageEl.style.setProperty('--grid', (g || 8) + "px"); this.stageEl.dataset.grid = g == 0 ? 'off' : 'on'; };
+        range.addEventListener('input', e => setGrid(e.target.value)); setGrid(range.value);
+        $('#subgridSwitch').addEventListener('change', e => { this.subgrid = e.target.checked; this.stageEl.dataset.subgrid = this.subgrid ? 'on' : 'off'; });
+        $('#setBg').addEventListener('click', () => { const url = $('#bgUrl').value.trim(); this.setBackground(url); });
+        this.stageEl.addEventListener('dragover', (e) => { e.preventDefault(); });
+        this.stageEl.addEventListener('drop', (e) => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const el = this.createElementByType(type); if (!el) return; const p = clientToStage(e, this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth) / 2, this.stageEl.clientWidth), 0, 100 - el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight) / 2, this.stageEl.clientHeight), 0, 100 - el.h); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
+        this.stageEl.addEventListener('mousedown', (e) => {
+          if (e.target === this.stageEl || e.target === this.canvas || e.target.classList.contains('stage-size')) {
+            if (!e.shiftKey && !e.ctrlKey) this.clearSelection();
+            const start = clientToStage(e, this.stageEl); const mq = $('#marquee'); mq.classList.remove('d-none'); Object.assign(mq.style, { left: start.x + 'px', top: start.y + 'px', width: 0, height: 0 });
+            const onMove = (ev) => {
+              const p = clientToStage(ev, this.stageEl); const x = Math.min(start.x, p.x), y = Math.min(start.y, p.y), w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y); Object.assign(mq.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+              const rx = { l: pxToPct(x, this.stageEl.clientWidth), t: pxToPct(y, this.stageEl.clientHeight), r: pxToPct(x + w, this.stageEl.clientWidth), b: pxToPct(y + h, this.stageEl.clientHeight) };
+              this.elements.forEach(el => { const ex = { l: el.x, t: el.y, r: el.x + el.w, b: el.y + el.h }; const hit = !(ex.l > rx.r || ex.r < rx.l || ex.t > rx.b || ex.b < rx.t); el.setSelected(hit); if (hit && !this.selected.includes(el)) this.selected.push(el); });
+            };
+            const onUp = () => { mq.classList.add('d-none'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) };
+            window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+          }
+        });
+        $('#btnExportHtml').addEventListener('click', () => this.exportHTML());
+        $$('[data-cmd]').forEach(b => b.addEventListener('click', () => this.execCommand(b.dataset.cmd)));
+      }
+      initKeyboard() {
+        window.addEventListener('keydown', (e) => {
+          if (!this.selected.length) return;
+          const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+          if (isArrow || e.key === 'Delete') e.preventDefault();
+          const stepX = e.shiftKey ? (this.gridPct().x || pxToPct(8, this.stageEl.clientWidth)) : pxToPct(1, this.stageEl.clientWidth);
+          const stepY = e.shiftKey ? (this.gridPct().y || pxToPct(8, this.stageEl.clientHeight)) : pxToPct(1, this.stageEl.clientHeight);
+          const useSnap = e.shiftKey;
+          switch (e.key) {
+            case 'Delete': this.deleteSelected(); break;
+            case 'ArrowLeft': this.nudge(-stepX, 0, { snap: useSnap }); break;
+            case 'ArrowRight': this.nudge(stepX, 0, { snap: useSnap }); break;
+            case 'ArrowUp': this.nudge(0, -stepY, { snap: useSnap }); break;
+            case 'ArrowDown': this.nudge(0, stepY, { snap: useSnap }); break;
+          }
+        }, true);
+      }
+      onElementChanged() { if (!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce = setTimeout(() => this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
+      nudge(dx, dy, opts = { snap: false }) {
+        const grid = this.gridPct();
+        this.selected.forEach(el => {
+          let nx = el.x + dx, ny = el.y + dy;
+          if (opts.snap) { nx = snapTo(nx, grid.x); ny = snapTo(ny, grid.y); }
+          nx = Math.max(0, Math.min(100 - el.w, nx));
+          ny = Math.max(0, Math.min(100 - el.h, ny));
+          el.x = nx; el.y = ny; el.applyTransform();
+        });
+        this.reflectSelection();
+      }
+      seedPalette() {
+        const items = [
+          { type: 'label', title: 'Etichetta di testo', klass: LabelElement },
+          { type: 'image', title: 'Immagine', klass: ImageElement },
+          { type: 'textbox', title: 'Casella di testo', klass: TextBoxElement },
+          { type: 'checkbox', title: 'Checkbox', klass: CheckboxElement },
+          { type: 'radiogroup', title: 'Opzioni (radio)', klass: RadioGroupElement }
+        ];
+        this.registry = new Map(items.map(i => [i.type, i]));
+        items.forEach(i => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable = true; b.dataset.type = i.type; b.innerHTML = `<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', () => { const el = this.createElementByType(i.type); el.mount(this.canvas); this.elements.push(el); this.selectOnly(el); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); this.palette.appendChild(b); });
+      }
+      createElementByType(type) { const meta = this.registry.get(type); return meta ? new meta.klass() : null; }
+      clearSelection() { this.selected.forEach(e => e.setSelected(false)); this.selected = []; this.renderPropPanel(); }
+      toggleSelect(el) { const i = this.selected.indexOf(el); if (i >= 0) { this.selected.splice(i, 1); el.setSelected(false); } else { this.selected.push(el); el.setSelected(true); } this.renderPropPanel(); }
+      selectOnly(el) { this.clearSelection(); if (el) { this.selected = [el]; el.setSelected(true); } this.renderPropPanel(); }
+      selectInclude(el) { if (!this.selected.includes(el)) this.selected.push(el); el.setSelected(true); this.renderPropPanel(); }
+      reflectSelection() { if (this.selected.length !== 1) { this.renderPropPanel(); return; } const sel = this.selected[0]; $$('#propForm [data-prop]').forEach(inp => { const k = inp.dataset.prop; if (['x', 'y', 'w', 'h', 'z', 'fontSize'].includes(k)) inp.value = sel[k]; if (k === 'lockRatio') inp.checked = !!sel.lockRatio; }); }
+      deleteSelected() { this.selected.forEach(s => { s.dom.remove(); this.elements = this.elements.filter(e => e !== s); }); this.clearSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
+      renderPropPanel() {
+        const f = this.propForm; f.innerHTML = '';
+        if (!this.selected.length) {
+          const step = this.stepMgr?.activeStep; if (!step) { f.innerHTML = '<div class="text-secondary small">Nessuno step attivo</div>'; return; }
+          const wrap = document.createElement('div');
+          wrap.innerHTML = `<div class="mb-2"><label class="form-label small">Titolo step</label><input id="stepName" class="form-control form-control-sm" type="text" value="${step.name}"></div>
       <div class="mb-2"><label class="form-label small">Orientamento</label><select id="stepOrient" class="form-select form-select-sm"><option value="landscape">16:9</option><option value="portrait">9:16</option></select></div>
-      <div class="mb-2"><label class="form-label small">Sfondo (URL)</label><input id="stepBg" class="form-control form-control-sm" type="url" value="${step.bgUrl||''}" placeholder="https://…/img.jpg"></div>`;
-      f.appendChild(wrap);
-      $('#stepOrient',wrap).value = step.orient;
-      $('#stepName',wrap).addEventListener('input', e=>{ step.name=e.target.value||step.name; this.stepMgr.render(); });
-      $('#stepOrient',wrap).addEventListener('change', e=>{ step.orient=e.target.value; this.changeOrientation(step.orient); this.stepMgr.render(); });
-      $('#stepBg',wrap).addEventListener('change', e=>{ step.bgUrl=e.target.value.trim(); this.setBackground(step.bgUrl); this.stepMgr.scheduleThumb(step); });
-      return;
-    }
-    if(this.selected.length>1){ f.innerHTML='<div class="text-secondary small">Selezionati: '+this.selected.length+' elementi</div>'; return; }
-    const el=this.selected[0]; const schema=el.getPropSchema();
-    const header=document.createElement('div'); header.className='d-flex justify-content-between align-items-center mb-1'; header.innerHTML=`<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
-    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete',header).addEventListener('click',(e)=>{ e.preventDefault(); this.selectOnly(el); this.deleteSelected(); });
-    schema.forEach(def=>{ const row=document.createElement('div'); row.className='mb-2'; const id=Editor.uid('prop'); const label=document.createElement('label'); label.className='form-label small'; label.htmlFor=id; label.textContent=def.label; let input;
-      if(def.type==='textarea'){ input=document.createElement('textarea'); input.className='form-control form-control-sm'; input.rows=2; }
-      else if(def.type==='select'){ input=document.createElement('select'); input.className='form-select form-select-sm'; def.options.forEach(([v,lab])=>{ const o=document.createElement('option'); o.value=v; o.textContent=lab; input.appendChild(o); }); }
-      else if(def.type==='checkbox'){ input=document.createElement('input'); input.type='checkbox'; input.className='form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id=id; input.dataset.prop=def.key; input.checked=!!el[def.key]; input.addEventListener('input', ()=>{ el[def.key]=input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
-      else{ input=document.createElement('input'); input.type=def.type||'text'; input.className='form-control form-control-sm'; if(def.min!=null) input.min=def.min; }
-      input.id=id; input.dataset.prop=def.key; let v=el[def.key]; if(def.key==='options') v=el.options.join(';'); if(def.type!=='checkbox') input.value = v ?? '';
-      input.addEventListener('input', ()=>{ let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); el[def.key]=val; if(['x','y','w','h','z'].includes(def.key)) el.applyTransform(); else el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
-      row.appendChild(label); row.appendChild(input); f.appendChild(row); });
-  }
-  execCommand(cmd){ const sel=[...this.selected]; if(sel.length<1) return; const bbox={ minX:Math.min(...sel.map(e=>e.x)), maxX:Math.max(...sel.map(e=>e.x+e.w)), minY:Math.min(...sel.map(e=>e.y)), maxY:Math.max(...sel.map(e=>e.y+e.h)) };
-    const centerX=(bbox.minX+bbox.maxX)/2, centerY=(bbox.minY+bbox.maxY)/2;
-    switch(cmd){
-      case 'align-left': sel.forEach(e=>{ e.x=bbox.minX; e.applyTransform();}); break;
-      case 'align-right': sel.forEach(e=>{ e.x=bbox.maxX - e.w; e.applyTransform();}); break;
-      case 'align-hcenter': sel.forEach(e=>{ e.x = centerX - e.w/2; e.applyTransform();}); break;
-      case 'align-top': sel.forEach(e=>{ e.y=bbox.minY; e.applyTransform();}); break;
-      case 'align-bottom': sel.forEach(e=>{ e.y=bbox.maxY - e.h; e.applyTransform();}); break;
-      case 'align-vcenter': sel.forEach(e=>{ e.y = centerY - e.h/2; e.applyTransform();}); break;
-      case 'dist-h': this.distribute(sel,'x','w'); break;
-      case 'dist-v': this.distribute(sel,'y','h'); break;
-      case 'front': sel.forEach(e=>{ e.z = Math.max(...this.elements.map(x=>x.z))+1; e.applyTransform();}); break;
-      case 'back': sel.forEach(e=>{ e.z = Math.max(0, (e.z|0) - 1); e.applyTransform();}); break;
-    }
-    this.reflectSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep);
-  }
-  distribute(sel, axis, sizeKey){ sel.sort((a,b)=> a[axis]-b[axis]); const first=sel[0], last=sel[sel.length-1]; const start=first[axis], end=last[axis] + last[sizeKey]; const total=sel.reduce((s,e)=> s+e[sizeKey], 0); const gaps=sel.length-1; const space=(end-start-total)/gaps; let pos=start; sel.forEach((e,i)=>{ if(i===0) { pos=e[axis]+e[sizeKey]; return; } e[axis]=pos; e.applyTransform(); pos += e[sizeKey] + space; }); }
- exportHTML(){
-  const orient = this.stageEl.dataset.orient;
-  const stepName = this.stepMgr?.activeStep?.name || 'Step';
-  
-  // Clona il contenuto
-  const clone = this.canvas.cloneNode(true);
-  $$('.el', clone).forEach(n=>{
-    n.classList.remove('selected');
-    $$('.handles',n).forEach(h=>h.remove());
-    n.removeAttribute('data-type');
-  });
+      <div class="mb-2"><label class="form-label small">Sfondo (URL)</label><input id="stepBg" class="form-control form-control-sm" type="url" value="${step.bgUrl || ''}" placeholder="https://…/img.jpg"></div>`;
+          f.appendChild(wrap);
+          $('#stepOrient', wrap).value = step.orient;
+          $('#stepName', wrap).addEventListener('input', e => { step.name = e.target.value || step.name; this.stepMgr.render(); });
+          $('#stepOrient', wrap).addEventListener('change', e => { step.orient = e.target.value; this.changeOrientation(step.orient); this.stepMgr.render(); });
+          $('#stepBg', wrap).addEventListener('change', e => { step.bgUrl = e.target.value.trim(); this.setBackground(step.bgUrl); this.stepMgr.scheduleThumb(step); });
+          return;
+        }
+        if (this.selected.length > 1) { f.innerHTML = '<div class="text-secondary small">Selezionati: ' + this.selected.length + ' elementi</div>'; return; }
+        const el = this.selected[0]; const schema = el.getPropSchema();
+        const header = document.createElement('div'); header.className = 'd-flex justify-content-between align-items-center mb-1'; header.innerHTML = `<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
+    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete', header).addEventListener('click', (e) => { e.preventDefault(); this.selectOnly(el); this.deleteSelected(); });
+        schema.forEach(def => {
+          const row = document.createElement('div'); row.className = 'mb-2'; const id = Editor.uid('prop'); const label = document.createElement('label'); label.className = 'form-label small'; label.htmlFor = id; label.textContent = def.label; let input;
+          if (def.type === 'textarea') { input = document.createElement('textarea'); input.className = 'form-control form-control-sm'; input.rows = 2; }
+          else if (def.type === 'select') { input = document.createElement('select'); input.className = 'form-select form-select-sm'; def.options.forEach(([v, lab]) => { const o = document.createElement('option'); o.value = v; o.textContent = lab; input.appendChild(o); }); }
+          else if (def.type === 'checkbox') { input = document.createElement('input'); input.type = 'checkbox'; input.className = 'form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id = id; input.dataset.prop = def.key; input.checked = !!el[def.key]; input.addEventListener('input', () => { el[def.key] = input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
+          else { input = document.createElement('input'); input.type = def.type || 'text'; input.className = 'form-control form-control-sm'; if (def.min != null) input.min = def.min; }
+          input.id = id; input.dataset.prop = def.key; let v = el[def.key]; if (def.key === 'options') v = el.options.join(';'); if (def.type !== 'checkbox') input.value = v ?? '';
+          input.addEventListener('input', () => { let val = input.value; if (['x', 'y', 'w', 'h', 'fontSize', 'z'].includes(def.key)) val = Number(val || 0); if (def.key === 'options') val = val.split(';').map(s => s.trim()).filter(Boolean); if (def.key === 'z') val = Math.max(0, val); el[def.key] = val; if (['x', 'y', 'w', 'h', 'z'].includes(def.key)) el.applyTransform(); else el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); });
+          row.appendChild(label); row.appendChild(input); f.appendChild(row);
+        });
+      }
+      execCommand(cmd) {
+        const sel = [...this.selected]; if (sel.length < 1) return; const bbox = { minX: Math.min(...sel.map(e => e.x)), maxX: Math.max(...sel.map(e => e.x + e.w)), minY: Math.min(...sel.map(e => e.y)), maxY: Math.max(...sel.map(e => e.y + e.h)) };
+        const centerX = (bbox.minX + bbox.maxX) / 2, centerY = (bbox.minY + bbox.maxY) / 2;
+        switch (cmd) {
+          case 'align-left': sel.forEach(e => { e.x = bbox.minX; e.applyTransform(); }); break;
+          case 'align-right': sel.forEach(e => { e.x = bbox.maxX - e.w; e.applyTransform(); }); break;
+          case 'align-hcenter': sel.forEach(e => { e.x = centerX - e.w / 2; e.applyTransform(); }); break;
+          case 'align-top': sel.forEach(e => { e.y = bbox.minY; e.applyTransform(); }); break;
+          case 'align-bottom': sel.forEach(e => { e.y = bbox.maxY - e.h; e.applyTransform(); }); break;
+          case 'align-vcenter': sel.forEach(e => { e.y = centerY - e.h / 2; e.applyTransform(); }); break;
+          case 'dist-h': this.distribute(sel, 'x', 'w'); break;
+          case 'dist-v': this.distribute(sel, 'y', 'h'); break;
+          case 'front': sel.forEach(e => { e.z = Math.max(...this.elements.map(x => x.z)) + 1; e.applyTransform(); }); break;
+          case 'back': sel.forEach(e => { e.z = Math.max(0, (e.z | 0) - 1); e.applyTransform(); }); break;
+        }
+        this.reflectSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep);
+      }
+      distribute(sel, axis, sizeKey) { sel.sort((a, b) => a[axis] - b[axis]); const first = sel[0], last = sel[sel.length - 1]; const start = first[axis], end = last[axis] + last[sizeKey]; const total = sel.reduce((s, e) => s + e[sizeKey], 0); const gaps = sel.length - 1; const space = (end - start - total) / gaps; let pos = start; sel.forEach((e, i) => { if (i === 0) { pos = e[axis] + e[sizeKey]; return; } e[axis] = pos; e.applyTransform(); pos += e[sizeKey] + space; }); }
+      exportHTML() {
+        const orient = this.stageEl.dataset.orient;
+        const stepName = this.stepMgr?.activeStep?.name || 'Step';
 
-  const wrapper=document.createElement('div');
-  wrapper.style.position='relative';
-  wrapper.style.width='100%';
-  wrapper.style.aspectRatio = orient==='portrait' ? '9/16' : '16/9';
-  wrapper.appendChild(clone);
+        // Clona il contenuto
+        const clone = this.canvas.cloneNode(true);
+        $$('.el', clone).forEach(n => {
+          n.classList.remove('selected');
+          $$('.handles', n).forEach(h => h.remove());
+          n.removeAttribute('data-type');
+        });
 
-  // Head preso dall'editor, title cambiato
-  const headHTML = `
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'relative';
+        wrapper.style.width = '100%';
+        wrapper.style.aspectRatio = orient === 'portrait' ? '9/16' : '16/9';
+        wrapper.appendChild(clone);
+
+        // Head preso dall'editor, title cambiato
+        const headHTML = `
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -629,7 +985,7 @@ class Editor{
   </style>
 </head>`;
 
-  const fullHTML = `<!DOCTYPE html>
+        const fullHTML = `<!DOCTYPE html>
 <html lang="it">
 ${headHTML}
 <body>
@@ -637,68 +993,69 @@ ${wrapper.outerHTML}
 </body>
 </html>`;
 
-  const blob = new Blob([fullHTML],{type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = stepName.replace(/[^\w\d_-]+/g,'_')+'.html';
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 1000);
-}
+        const blob = new Blob([fullHTML], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = stepName.replace(/[^\w\d_-]+/g, '_') + '.html';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
 
-  loadStep(step){
-    this.elements.forEach(e=> e.unmount()); this.clearSelection();
-    this.elements = step.items;
-    this.changeOrientation(step.orient, {syncToolbar:true, suppressRender:true});
-    this.setBackground(step.bgUrl, {suppressThumb:true});
-    this.canvas.innerHTML='';
-    this.elements.forEach(e=> e.mount(this.canvas));
-    this.layoutStage();
-    this.renderPropPanel();
-  }
-  changeOrientation(orient, opts={}){
-    this.stageEl.dataset.orient = orient==='portrait' ? 'portrait' : 'landscape';
-    if(opts.syncToolbar){ $('#orientLandscape').checked = orient!=='portrait'; $('#orientPortrait').checked = orient==='portrait'; }
-    this.layoutStage();
-    if(this.stepMgr?.activeStep){ this.stepMgr.activeStep.orient=this.stageEl.dataset.orient; if(!opts.suppressRender) this.stepMgr.render(); }
-  }
-  setBackground(url, opts={}){
-    this.canvas.style.background = url? `center/cover no-repeat url('${url}')` : '';
-    if(this.stepMgr?.activeStep){ this.stepMgr.activeStep.bgUrl=url||''; if(!opts.suppressThumb) this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
-  }
-}
+      loadStep(step) {
+        this.elements.forEach(e => e.unmount()); this.clearSelection();
+        this.elements = step.items;
+        this.changeOrientation(step.orient, { syncToolbar: true, suppressRender: true });
+        this.setBackground(step.bgUrl, { suppressThumb: true });
+        this.canvas.innerHTML = '';
+        this.elements.forEach(e => e.mount(this.canvas));
+        this.layoutStage();
+        this.renderPropPanel();
+      }
+      changeOrientation(orient, opts = {}) {
+        this.stageEl.dataset.orient = orient === 'portrait' ? 'portrait' : 'landscape';
+        if (opts.syncToolbar) { $('#orientLandscape').checked = orient !== 'portrait'; $('#orientPortrait').checked = orient === 'portrait'; }
+        this.layoutStage();
+        if (this.stepMgr?.activeStep) { this.stepMgr.activeStep.orient = this.stageEl.dataset.orient; if (!opts.suppressRender) this.stepMgr.render(); }
+      }
+      setBackground(url, opts = {}) {
+        this.canvas.style.background = url ? `center/cover no-repeat url('${url}')` : '';
+        if (this.stepMgr?.activeStep) { this.stepMgr.activeStep.bgUrl = url || ''; if (!opts.suppressThumb) this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
+      }
+    }
 
-// ---- src/tests/dev-tests.js ----
-function approx(a,b,tol=0.06){ return Math.abs(a-b) <= tol; }
-function runTests(ed){
-  try{
-    console.group('%cMedel Editor – Tests','color:#0d6efd');
-    const stage = ed.stageEl; const outer = stage.parentElement;
-    ed.changeOrientation('landscape', {syncToolbar:true});
-    console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in landscape');
-    console.assert(approx(stage.offsetWidth/stage.offsetHeight, 16/9, 0.08), 'Aspect ~ 16/9');
-    ed.changeOrientation('portrait', {syncToolbar:true});
-    console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in portrait');
-    console.assert(approx(stage.offsetWidth/stage.offsetHeight, 9/16, 0.08), 'Aspect ~ 9/16');
-    const sm=ed.stepMgr; const cat0=sm.categories[0]; const s2=sm.addStep(cat0, 'Step 2'); sm.setActive(s2);
-    console.assert(sm.activeStep===s2, 'Active step is Step 2');
-    sm.setActive(cat0.steps[0]); console.assert(sm.activeStep===cat0.steps[0], 'Back to Step 1');
-    const testEl = new (ed.registry.get('label').klass)();; testEl.mount(ed.canvas); ed.elements.push(testEl); ed.selectOnly(testEl);
-    const beforeX = testEl.x; ed.nudge(1,0,{snap:false});
-    console.assert(Math.abs(testEl.x - (beforeX+1)) < 0.01, 'Nudge moves element by ~1% X');
-    testEl.dom.remove(); ed.elements = ed.elements.filter(e=>e!==testEl); ed.clearSelection();
-    console.groupEnd();
-  }catch(err){ console.error('Test harness error:', err); }
-}
+    // ---- src/tests/dev-tests.js ----
+    function approx(a, b, tol = 0.06) { return Math.abs(a - b) <= tol; }
+    function runTests(ed) {
+      try {
+        console.group('%cMedel Editor – Tests', 'color:#0d6efd');
+        const stage = ed.stageEl; const outer = stage.parentElement;
+        ed.changeOrientation('landscape', { syncToolbar: true });
+        console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in landscape');
+        console.assert(approx(stage.offsetWidth / stage.offsetHeight, 16 / 9, 0.08), 'Aspect ~ 16/9');
+        ed.changeOrientation('portrait', { syncToolbar: true });
+        console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in portrait');
+        console.assert(approx(stage.offsetWidth / stage.offsetHeight, 9 / 16, 0.08), 'Aspect ~ 9/16');
+        const sm = ed.stepMgr; const cat0 = sm.categories[0]; const s2 = sm.addStep(cat0, 'Step 2'); sm.setActive(s2);
+        console.assert(sm.activeStep === s2, 'Active step is Step 2');
+        sm.setActive(cat0.steps[0]); console.assert(sm.activeStep === cat0.steps[0], 'Back to Step 1');
+        const testEl = new (ed.registry.get('label').klass)();; testEl.mount(ed.canvas); ed.elements.push(testEl); ed.selectOnly(testEl);
+        const beforeX = testEl.x; ed.nudge(1, 0, { snap: false });
+        console.assert(Math.abs(testEl.x - (beforeX + 1)) < 0.01, 'Nudge moves element by ~1% X');
+        testEl.dom.remove(); ed.elements = ed.elements.filter(e => e !== testEl); ed.clearSelection();
+        console.groupEnd();
+      } catch (err) { console.error('Test harness error:', err); }
+    }
 
-// ---- src/main.js ----
+    // ---- src/main.js ----
 
 
-window.addEventListener('DOMContentLoaded', ()=>{
-  const editor = new Editor();
-  setTimeout(()=> runTests(editor), 100);
-});
+    window.addEventListener('DOMContentLoaded', () => {
+      const editor = new Editor();
+      setTimeout(() => runTests(editor), 100);
+    });
 
-</script>
+  </script>
 </body>
+
 </html>

@@ -131,7 +131,7 @@ export class MoveElementsCommand extends BaseCommand {
   canMergeWith(otherCommand) {
     if (!(otherCommand instanceof MoveElementsCommand)) return false;
     if (this.elements.length !== otherCommand.elements.length) return false;
-    
+
     // Check if same elements
     return this.elements.every(el => otherCommand.elements.includes(el));
   }
@@ -214,8 +214,8 @@ export class ChangePropertyCommand extends BaseCommand {
 
   canMergeWith(otherCommand) {
     if (!(otherCommand instanceof ChangePropertyCommand)) return false;
-    return this.element === otherCommand.element && 
-           this.property === otherCommand.property;
+    return this.element === otherCommand.element &&
+      this.property === otherCommand.property;
   }
 
   mergeWith(otherCommand) {

@@ -10,11 +10,11 @@ import TextBoxElement from '../elements/TextBoxElement.js';
 import CheckboxElement from '../elements/CheckboxElement.js';
 import RadioGroupElement from '../elements/RadioGroupElement.js';
 
-export default class Editor{
+export default class Editor {
   static instance;
-  static uid = (p)=> uid(p);
-  constructor(){
-    if (Editor.instance) return Editor.instance; 
+  static uid = (p) => uid(p);
+  constructor() {
+    if (Editor.instance) return Editor.instance;
     Editor.instance = this;
 
     this.palette = $('#palette');
@@ -29,6 +29,10 @@ export default class Editor{
     this._thumbDebounce = null;
     this.clipboard = null;                 // { items:[...], source:'internal'|'system' }
     this._lastPasteOffset = { x: 0, y: 0 };// bump incrementale tra paste consecutivi 
+    this.zoom = 1;          // 1 = 100%
+    this.minZoom = 0.25;    // 25%
+    this.maxZoom = 4;       // 400%
+
 
     // 1) Costruisci UI e bottoni undo/redo
     this.initUI();
@@ -49,179 +53,212 @@ export default class Editor{
     this.seedPalette();
 
     this.layoutStage();
-    window.addEventListener('resize', ()=> this.layoutStage());
+    window.addEventListener('resize', () => this.layoutStage());
 
     window.__editor__ = this;
   }
 
-  serializeElement(el){
-  const base = { type:el.type, x:el.x, y:el.y, w:el.w, h:el.h, z:el.z|0, rotation:el.rotation||0, lockRatio:!!el.lockRatio };
-  switch(el.type){
-    case 'label': Object.assign(base,{ text:el.text, fontSize:el.fontSize, color:el.color, align:el.align }); break;
-    case 'image': Object.assign(base,{ src:el.src, alt:el.alt, fit:el.fit }); break;
-    case 'textbox': Object.assign(base,{ placeholder:el.placeholder, name:el.name, align:el.align }); break;
-    case 'checkbox': Object.assign(base,{ label:el.label, name:el.name, checked:!!el.checked }); break;
-    case 'radiogroup': Object.assign(base,{ name:el.name, options:[...(el.options||[])], inline:!!el.inline }); break;
+  serializeElement(el) {
+    const base = { type: el.type, x: el.x, y: el.y, w: el.w, h: el.h, z: el.z | 0, rotation: el.rotation || 0, lockRatio: !!el.lockRatio };
+    switch (el.type) {
+      case 'label': Object.assign(base, { text: el.text, fontSize: el.fontSize, color: el.color, align: el.align }); break;
+      case 'image': Object.assign(base, { src: el.src, alt: el.alt, fit: el.fit }); break;
+      case 'textbox': Object.assign(base, { placeholder: el.placeholder, name: el.name, align: el.align }); break;
+      case 'checkbox': Object.assign(base, { label: el.label, name: el.name, checked: !!el.checked }); break;
+      case 'radiogroup': Object.assign(base, { name: el.name, options: [...(el.options || [])], inline: !!el.inline }); break;
+    }
+    return base;
   }
-  return base;
-}
-deserializeElement(obj, offset={x:0,y:0}){
-  const el = this.createElementByType(obj.type);
-  // base
-  el.x = clamp((obj.x||0) + (offset.x||0), 0, 100 - (obj.w||1));
-  el.y = clamp((obj.y||0) + (offset.y||0), 0, 100 - (obj.h||1));
-  el.w = Math.max(1, obj.w||1);
-  el.h = Math.max(1, obj.h||1);
-  el.z = obj.z|0;
-  el.rotation = obj.rotation||0;
-  el.lockRatio = !!obj.lockRatio;
-  // specifici
-  switch(obj.type){
-    case 'label': el.text=obj.text||el.text; el.fontSize=obj.fontSize??el.fontSize; el.color=obj.color||el.color; el.align=obj.align||el.align; break;
-    case 'image': el.src=obj.src||el.src; el.alt=obj.alt||el.alt; el.fit=obj.fit||el.fit; break;
-    case 'textbox': el.placeholder=obj.placeholder||el.placeholder; el.name=obj.name||el.name; el.align=obj.align||el.align; break;
-    case 'checkbox': el.label=obj.label||el.label; el.name=obj.name||el.name; el.checked=!!obj.checked; break;
-    case 'radiogroup': el.name=obj.name||el.name; el.options=[...(obj.options||el.options||[])]; el.inline=!!obj.inline; break;
+  deserializeElement(obj, offset = { x: 0, y: 0 }) {
+    const el = this.createElementByType(obj.type);
+    // base
+    el.x = clamp((obj.x || 0) + (offset.x || 0), 0, 100 - (obj.w || 1));
+    el.y = clamp((obj.y || 0) + (offset.y || 0), 0, 100 - (obj.h || 1));
+    el.w = Math.max(1, obj.w || 1);
+    el.h = Math.max(1, obj.h || 1);
+    el.z = obj.z | 0;
+    el.rotation = obj.rotation || 0;
+    el.lockRatio = !!obj.lockRatio;
+    // specifici
+    switch (obj.type) {
+      case 'label': el.text = obj.text || el.text; el.fontSize = obj.fontSize ?? el.fontSize; el.color = obj.color || el.color; el.align = obj.align || el.align; break;
+      case 'image': el.src = obj.src || el.src; el.alt = obj.alt || el.alt; el.fit = obj.fit || el.fit; break;
+      case 'textbox': el.placeholder = obj.placeholder || el.placeholder; el.name = obj.name || el.name; el.align = obj.align || el.align; break;
+      case 'checkbox': el.label = obj.label || el.label; el.name = obj.name || el.name; el.checked = !!obj.checked; break;
+      case 'radiogroup': el.name = obj.name || el.name; el.options = [...(obj.options || el.options || [])]; el.inline = !!obj.inline; break;
+    }
+    return el;
   }
-  return el;
-}
-serializeSelection(){
-  return this.selected.map(el => this.serializeElement(el));
-}
-copySelected(){
-  if (!this.selected.length) return;
-  this.clipboard = { items: this.serializeSelection(), source: 'internal' };
-  // opzionale: prova a mettere anche nel system clipboard come testo JSON (non necessario al funzionamento)
-  try {
-    const txt = JSON.stringify(this.clipboard.items);
-    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).catch(()=>{});
-  } catch {}
-}
+  serializeSelection() {
+    return this.selected.map(el => this.serializeElement(el));
+  }
+  copySelected() {
+    if (!this.selected.length) return;
+    this.clipboard = { items: this.serializeSelection(), source: 'internal' };
+    // opzionale: prova a mettere anche nel system clipboard come testo JSON (non necessario al funzionamento)
+    try {
+      const txt = JSON.stringify(this.clipboard.items);
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt).catch(() => { });
+    } catch { }
+  }
 
-cutSelected(){
-  if (!this.selected.length) return;
-  // salva clipboard
-  this.copySelected();
-  // elimina come comando (undo/redo)
-  const cmd = new DeleteElementsCommand(this, [...this.selected], 'Taglia elementi');
-  this.commandMgr.executeCommand(cmd);
-}
+  cutSelected() {
+    if (!this.selected.length) return;
+    // salva clipboard
+    this.copySelected();
+    // elimina come comando (undo/redo)
+    const cmd = new DeleteElementsCommand(this, [...this.selected], 'Taglia elementi');
+    this.commandMgr.executeCommand(cmd);
+  }
 
-pasteFromClipboard(){
-  // fonte primaria: in-memory
-  let items = this.clipboard?.items;
-  // se non abbiamo in-memory, prova dal system clipboard (best-effort)
-  const useSystem = async ()=>{
-    try{
-      const txt = await navigator.clipboard.readText();
-      const arr = JSON.parse(txt);
-      if (Array.isArray(arr)) return arr;
-    }catch{}
-    return null;
-  };
-
-  const proceed = (arr)=>{
-    if (!arr || !arr.length) return;
-
-    // calcola offset: “bump” coerente con la griglia
-    const g = this.gridPct();
-    const bump = {
-      x: (g.x || 1), // se griglia off, 1%
-      y: (g.y || 1)
+  pasteFromClipboard() {
+    // fonte primaria: in-memory
+    let items = this.clipboard?.items;
+    // se non abbiamo in-memory, prova dal system clipboard (best-effort)
+    const useSystem = async () => {
+      try {
+        const txt = await navigator.clipboard.readText();
+        const arr = JSON.parse(txt);
+        if (Array.isArray(arr)) return arr;
+      } catch { }
+      return null;
     };
-    // accumula per paste consecutivi
-    this._lastPasteOffset.x = (this._lastPasteOffset.x + bump.x) % 100;
-    this._lastPasteOffset.y = (this._lastPasteOffset.y + bump.y) % 100;
 
-    const offset = { x: this._lastPasteOffset.x, y: this._lastPasteOffset.y };
+    const proceed = (arr) => {
+      if (!arr || !arr.length) return;
 
-    // crea istanze nuove
-    const newEls = arr.map(obj => this.deserializeElement(obj, offset));
-    // commit come comando unico
-    const cmd = new AddElementsCommand(this, newEls, 'Incolla elementi');
-    this.commandMgr.executeCommand(cmd);
-  };
+      // calcola offset: “bump” coerente con la griglia
+      const g = this.gridPct();
+      const bump = {
+        x: (g.x || 1), // se griglia off, 1%
+        y: (g.y || 1)
+      };
+      // accumula per paste consecutivi
+      this._lastPasteOffset.x = (this._lastPasteOffset.x + bump.x) % 100;
+      this._lastPasteOffset.y = (this._lastPasteOffset.y + bump.y) % 100;
 
-  if (items && items.length) {
-    proceed(items);
-  } else {
-    // async best-effort dal system clipboard
-    useSystem().then(proceed);
+      const offset = { x: this._lastPasteOffset.x, y: this._lastPasteOffset.y };
+
+      // crea istanze nuove
+      const newEls = arr.map(obj => this.deserializeElement(obj, offset));
+      // commit come comando unico
+      const cmd = new AddElementsCommand(this, newEls, 'Incolla elementi');
+      this.commandMgr.executeCommand(cmd);
+    };
+
+    if (items && items.length) {
+      proceed(items);
+    } else {
+      // async best-effort dal system clipboard
+      useSystem().then(proceed);
+    }
   }
-}
 
-  startGroupDrag(el, e){
-  if (e.button !== 0) return;                    // solo sinistro
-  if (e.target.closest('.handles')) return;      // evita i resize handle
+  startGroupDrag(el, e) {
+    if (e.button !== 0) return;                    // solo sinistro
+    if (e.target.closest('.handles')) return;      // evita i resize handle
 
-  // se non è già selezionato, gestisci la selezione
-  if (!this.selected.includes(el)) {
-    if (e.ctrlKey || e.shiftKey) this.selectInclude(el);
-    else this.selectOnly(el);
+    // se non è già selezionato, gestisci la selezione
+    if (!this.selected.includes(el)) {
+      if (e.ctrlKey || e.shiftKey) this.selectInclude(el);
+      else this.selectOnly(el);
+    }
+
+    const start = clientToStage(e, this.stageEl);
+    const starts = this.selected.map(s => ({ s, x: s.x, y: s.y }));
+    const grid = this.gridPct();
+    const snapIt = e.shiftKey;                     // SHIFT = snap (coerente col resto)
+
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const p = clientToStage(ev, this.stageEl);
+      let dx = pxToPct(p.x - start.x, this.stageEl.clientWidth);
+      let dy = pxToPct(p.y - start.y, this.stageEl.clientHeight);
+      if (snapIt) { dx = snapTo(dx, grid.x); dy = snapTo(dy, grid.y); }
+
+      // anteprima: muove tutti i selezionati con clamp ai bordi
+      starts.forEach(({ s, x, y }) => {
+        let nx = clamp(x + dx, 0, 100 - s.w);
+        let ny = clamp(y + dy, 0, 100 - s.h);
+        s.x = nx; s.y = ny; s.applyTransform();
+      });
+    };
+
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove, true);
+      window.removeEventListener('mouseup', onUp, true);
+
+      // delta finale (uguale per tutti) rispetto alle posizioni originali
+      const dx = this.selected[0].x - starts[0].x;
+      const dy = this.selected[0].y - starts[0].y;
+      if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return;
+
+      // ripristina preview e committa come unico comando
+      starts.forEach(({ s, x, y }) => { s.x = x; s.y = y; s.applyTransform(); });
+      const cmd = new MoveElementsCommand(this, this.selected, dx, dy, 'Sposta elementi');
+      this.commandMgr.executeCommand(cmd);
+      this.stepMgr.scheduleThumb(this.stepMgr.activeStep);
+    };
+
+    window.addEventListener('mousemove', onMove, true);
+    window.addEventListener('mouseup', onUp, true);
   }
-
-  const start = clientToStage(e, this.stageEl);
-  const starts = this.selected.map(s => ({ s, x: s.x, y: s.y }));
-  const grid   = this.gridPct();
-  const snapIt = e.shiftKey;                     // SHIFT = snap (coerente col resto)
-
-  const onMove = (ev)=>{
-    ev.preventDefault();
-    const p  = clientToStage(ev, this.stageEl);
-    let dx = pxToPct(p.x - start.x, this.stageEl.clientWidth);
-    let dy = pxToPct(p.y - start.y, this.stageEl.clientHeight);
-    if (snapIt) { dx = snapTo(dx, grid.x); dy = snapTo(dy, grid.y); }
-
-    // anteprima: muove tutti i selezionati con clamp ai bordi
-    starts.forEach(({s, x, y})=>{
-      let nx = clamp(x + dx, 0, 100 - s.w);
-      let ny = clamp(y + dy, 0, 100 - s.h);
-      s.x = nx; s.y = ny; s.applyTransform();
-    });
-  };
-
-  const onUp = ()=>{
-    window.removeEventListener('mousemove', onMove, true);
-    window.removeEventListener('mouseup', onUp, true);
-
-    // delta finale (uguale per tutti) rispetto alle posizioni originali
-    const dx = this.selected[0].x - starts[0].x;
-    const dy = this.selected[0].y - starts[0].y;
-    if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return;
-
-    // ripristina preview e committa come unico comando
-    starts.forEach(({s, x, y})=>{ s.x = x; s.y = y; s.applyTransform(); });
-    const cmd = new MoveElementsCommand(this, this.selected, dx, dy, 'Sposta elementi');
-    this.commandMgr.executeCommand(cmd);
-    this.stepMgr.scheduleThumb(this.stepMgr.activeStep);
-  };
-
-  window.addEventListener('mousemove', onMove, true);
-  window.addEventListener('mouseup', onUp, true);
-}
-  layoutStage(){
+  layoutStage() {
     const outer = this.stageEl.parentElement;
     const cs = getComputedStyle(outer);
-    const pt = parseFloat(cs.paddingTop)||0, pb = parseFloat(cs.paddingBottom)||0;
-    const pl = parseFloat(cs.paddingLeft)||0, pr = parseFloat(cs.paddingRight)||0;
-    const cw = outer.clientWidth - pl - pr; const ch = outer.clientHeight - pt - pb;
+    const pt = parseFloat(cs.paddingTop) || 0, pb = parseFloat(cs.paddingBottom) || 0;
+    const pl = parseFloat(cs.paddingLeft) || 0, pr = parseFloat(cs.paddingRight) || 0;
+
+    const cw = outer.clientWidth - pl - pr;
+    const ch = outer.clientHeight - pt - pb;
+
     const orient = this.stageEl.dataset.orient || 'landscape';
-    const R = (orient==='portrait') ? (9/16) : (16/9);
-    let w = Math.min(cw, Math.floor(ch * R)); let h = Math.floor(w / R);
-    if(h > ch){ h = ch; w = Math.floor(h * R); } if(w > cw){ w = cw; h = Math.floor(w / R); }
+    const R = (orient === 'portrait') ? (9 / 16) : (16 / 9);
+
+    // dimensioni "base" che fanno FIT nel contenitore (senza zoom)
+    let baseW = Math.min(cw, Math.floor(ch * R));
+    let baseH = Math.floor(baseW / R);
+    if (baseH > ch) { baseH = ch; baseW = Math.floor(baseH * R); }
+    if (baseW > cw) { baseW = cw; baseH = Math.floor(baseW / R); }
+
+    // 1) imposta lo zoom come CSS var (usato da .stage-size)
+    this.stageEl.style.setProperty('--zoom', String(this.zoom));
+
+    // 2) la dimensione REALE di #stage cresce con lo zoom -> abilita le scrollbar
+    const w = Math.max(1, Math.floor(baseW * this.zoom));
+    const h = Math.max(1, Math.floor(baseH * this.zoom));
     Object.assign(this.stageEl.style, { width: w + 'px', height: h + 'px' });
   }
-  gridPct(){ const sx=this.stageEl.clientWidth, sy=this.stageEl.clientHeight; const g=this.grid; if(!g) return {x:0,y:0}; return { x: pxToPct(g, sx), y: pxToPct(g, sy) }; }
-  initUI(){
-    this.propForm.addEventListener('submit', (e)=> e.preventDefault()); this.propForm.setAttribute('novalidate','novalidate');
-    $('#orientLandscape').addEventListener('change', ()=>{ if($('#orientLandscape').checked){ this.changeOrientation('landscape'); }});
-    $('#orientPortrait').addEventListener('change', ()=>{ if($('#orientPortrait').checked){ this.changeOrientation('portrait'); }});
-    const range=$('#gridRange'), val=$('#gridVal');
-    const setGrid=(g)=>{ this.grid=Number(g); val.textContent = g==0?'off': g+"px"; this.stageEl.style.setProperty('--grid', (g||8)+"px"); this.stageEl.dataset.grid = g==0? 'off':'on'; };
-    range.addEventListener('input', e=> setGrid(e.target.value)); setGrid(range.value);
-    $('#subgridSwitch').addEventListener('change', e=>{ this.subgrid=e.target.checked; this.stageEl.dataset.subgrid = this.subgrid? 'on':'off'; });
-    $('#setBg').addEventListener('click', ()=>{ const url=$('#bgUrl').value.trim(); this.setBackground(url); });
-    
+
+  setZoom(z) {
+    // clamp tra minZoom e maxZoom
+    const nz = Math.max(this.minZoom, Math.min(this.maxZoom, z));
+    if (Math.abs(nz - this.zoom) < 1e-4) return; // niente da fare
+
+    this.zoom = nz;
+
+    // aggiorna la CSS var usata da .stage-size (se la usi)
+    this.stageEl.style.setProperty('--zoom', String(this.zoom));
+
+    // rilayoutta per aggiornare width/height reali dello stage (scrollbar)
+    this.layoutStage();
+  }
+
+  zoomBy(factor) {
+    this.setZoom(this.zoom * factor);
+  }
+
+  gridPct() { const sx = this.stageEl.clientWidth, sy = this.stageEl.clientHeight; const g = this.grid; if (!g) return { x: 0, y: 0 }; return { x: pxToPct(g, sx), y: pxToPct(g, sy) }; }
+  initUI() {
+    this.propForm.addEventListener('submit', (e) => e.preventDefault()); this.propForm.setAttribute('novalidate', 'novalidate');
+    $('#orientLandscape').addEventListener('change', () => { if ($('#orientLandscape').checked) { this.changeOrientation('landscape'); } });
+    $('#orientPortrait').addEventListener('change', () => { if ($('#orientPortrait').checked) { this.changeOrientation('portrait'); } });
+    const range = $('#gridRange'), val = $('#gridVal');
+    const setGrid = (g) => { this.grid = Number(g); val.textContent = g == 0 ? 'off' : g + "px"; this.stageEl.style.setProperty('--grid', (g || 8) + "px"); this.stageEl.dataset.grid = g == 0 ? 'off' : 'on'; };
+    range.addEventListener('input', e => setGrid(e.target.value)); setGrid(range.value);
+    $('#subgridSwitch').addEventListener('change', e => { this.subgrid = e.target.checked; this.stageEl.dataset.subgrid = this.subgrid ? 'on' : 'off'; });
+    $('#setBg').addEventListener('click', () => { const url = $('#bgUrl').value.trim(); this.setBackground(url); });
+
     // Add undo/redo buttons to toolbar
     const undoRedoGroup = document.createElement('div');
     undoRedoGroup.className = 'btn-group btn-group-sm me-2';
@@ -229,32 +266,72 @@ pasteFromClipboard(){
       <button id="btnUndo" type="button" class="btn btn-outline-light" title="Annulla (Ctrl+Z)" disabled>↶</button>
       <button id="btnRedo" type="button" class="btn btn-outline-light" title="Ripeti (Ctrl+Y)" disabled>↷</button>
     `;
-    
+
     // Insert after the align buttons
     const alignGroup = document.querySelector('.btn-group[aria-label="Align"]');
     alignGroup.parentNode.insertBefore(undoRedoGroup, alignGroup.nextSibling);
-    
+
     $('#btnUndo').addEventListener('click', () => this.commandMgr.undo());
     $('#btnRedo').addEventListener('click', () => this.commandMgr.redo());
-    
-    this.stageEl.addEventListener('dragover', (e)=>{ e.preventDefault(); });
-    this.stageEl.addEventListener('drop', (e)=>{ e.preventDefault(); const type=e.dataTransfer.getData('text/plain'); const el=this.createElementByType(type); if(!el) return; const p=clientToStage(e,this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth)/2, this.stageEl.clientWidth),0,100-el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight)/2, this.stageEl.clientHeight),0,100-el.h); const cmd = new AddElementCommand(this, el, `Aggiungi ${type}`); this.commandMgr.executeCommand(cmd); });
-    this.stageEl.addEventListener('mousedown', (e)=>{ if(e.target===this.stageEl || e.target===this.canvas || e.target.classList.contains('stage-size')){ if(!e.shiftKey&&!e.ctrlKey) this.clearSelection();
-        const start=clientToStage(e,this.stageEl); const mq=$('#marquee'); mq.classList.remove('d-none'); Object.assign(mq.style,{left:start.x+'px',top:start.y+'px',width:0,height:0});
-        const onMove=(ev)=>{ const p=clientToStage(ev,this.stageEl); const x=Math.min(start.x,p.x), y=Math.min(start.y,p.y), w=Math.abs(p.x-start.x), h=Math.abs(p.y-start.y); Object.assign(mq.style,{left:x+'px',top:y+'px',width:w+'px',height:h+'px'});
-          const rx={l:pxToPct(x,this.stageEl.clientWidth), t:pxToPct(y,this.stageEl.clientHeight), r:pxToPct(x+w,this.stageEl.clientWidth), b:pxToPct(y+h,this.stageEl.clientHeight)};
-          this.elements.forEach(el=>{ const ex={l:el.x, t:el.y, r:el.x+el.w, b:el.y+el.h}; const hit= !(ex.l>rx.r||ex.r<rx.l||ex.t>rx.b||ex.b<rx.t); el.setSelected(hit); if(hit && !this.selected.includes(el)) this.selected.push(el); }); };
-        const onUp=()=>{ mq.classList.add('d-none'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp)};
+
+    this.stageEl.addEventListener('dragover', (e) => { e.preventDefault(); });
+    this.stageEl.addEventListener('drop', (e) => { e.preventDefault(); const type = e.dataTransfer.getData('text/plain'); const el = this.createElementByType(type); if (!el) return; const p = clientToStage(e, this.stageEl); el.x = clamp(pxToPct(p.x - pctToPx(el.w, this.stageEl.clientWidth) / 2, this.stageEl.clientWidth), 0, 100 - el.w); el.y = clamp(pxToPct(p.y - pctToPx(el.h, this.stageEl.clientHeight) / 2, this.stageEl.clientHeight), 0, 100 - el.h); const cmd = new AddElementCommand(this, el, `Aggiungi ${type}`); this.commandMgr.executeCommand(cmd); });
+    this.stageEl.addEventListener('mousedown', (e) => {
+      if (e.target === this.stageEl || e.target === this.canvas || e.target.classList.contains('stage-size')) {
+        if (!e.shiftKey && !e.ctrlKey) this.clearSelection();
+        const start = clientToStage(e, this.stageEl); const mq = $('#marquee'); mq.classList.remove('d-none'); Object.assign(mq.style, { left: start.x + 'px', top: start.y + 'px', width: 0, height: 0 });
+        const onMove = (ev) => {
+          const p = clientToStage(ev, this.stageEl); const x = Math.min(start.x, p.x), y = Math.min(start.y, p.y), w = Math.abs(p.x - start.x), h = Math.abs(p.y - start.y); Object.assign(mq.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+          const rx = { l: pxToPct(x, this.stageEl.clientWidth), t: pxToPct(y, this.stageEl.clientHeight), r: pxToPct(x + w, this.stageEl.clientWidth), b: pxToPct(y + h, this.stageEl.clientHeight) };
+          this.elements.forEach(el => { const ex = { l: el.x, t: el.y, r: el.x + el.w, b: el.y + el.h }; const hit = !(ex.l > rx.r || ex.r < rx.l || ex.t > rx.b || ex.b < rx.t); el.setSelected(hit); if (hit && !this.selected.includes(el)) this.selected.push(el); });
+        };
+        const onUp = () => { mq.classList.add('d-none'); window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) };
         window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
-      }});
-    $('#btnExportHtml').addEventListener('click', ()=> this.caseExporter.exportCaseHTML());
-    $$('[data-cmd]').forEach(b=> b.addEventListener('click', ()=> this.execCommand(b.dataset.cmd)) );
+      }
+    });
+    $('#btnExportHtml').addEventListener('click', () => this.caseExporter.exportCaseHTML());
+    $$('[data-cmd]').forEach(b => b.addEventListener('click', () => this.execCommand(b.dataset.cmd)));
+    // Zoom con rotellina sul contenitore scrollabile + ancora sotto al cursore
+    const outer = this.stageEl.parentElement; // .stage-outer
+    outer.addEventListener('wheel', (e) => {
+
+      e.preventDefault();
+
+      const outerRect = outer.getBoundingClientRect();
+      const stageRect = this.stageEl.getBoundingClientRect();
+
+      // coordinate del mouse nel "sistema" di #stage considerando lo scroll attuale
+      const mouseXInStageScroll = (e.clientX - stageRect.left) + outer.scrollLeft;
+      const mouseYInStageScroll = (e.clientY - stageRect.top) + outer.scrollTop;
+
+      // frazioni relative (0..1) del punto ancora
+      const relX = mouseXInStageScroll / this.stageEl.clientWidth;
+      const relY = mouseYInStageScroll / this.stageEl.clientHeight;
+
+      // deltaY>0 => out, <0 => in
+      const factor = Math.pow(1.0015, e.deltaY);
+      this.zoomBy(1 / factor);              // aggiorna this.zoom e rilayoutta
+
+      // dopo il layout, ricalcola scroll per mantenere il punto sotto al mouse
+      const newW = this.stageEl.clientWidth;
+      const newH = this.stageEl.clientHeight;
+
+      const targetScrollLeft = (relX * newW) - (e.clientX - outerRect.left);
+      const targetScrollTop = (relY * newH) - (e.clientY - outerRect.top);
+
+      outer.scrollLeft = Math.max(0, targetScrollLeft);
+      outer.scrollTop = Math.max(0, targetScrollTop);
+    }, { passive: false });
+
   }
-  initKeyboard(){
-    window.addEventListener('keydown',(e)=>{
-      const tag = (e.target?.tagName||'').toUpperCase();
-      if (['INPUT','TEXTAREA'].includes(tag)) return;
-       if (e.ctrlKey || e.metaKey) {
+  initKeyboard() {
+    window.addEventListener('keydown', (e) => {
+      const tag = (e.target?.tagName || '').toUpperCase();
+      if (['INPUT', 'TEXTAREA'].includes(tag)) return;
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '+') { e.preventDefault(); this.zoomBy(1.1); return; }
+        if (e.key === '-') { e.preventDefault(); this.zoomBy(1 / 1.1); return; }
+        if (e.key === '0') { e.preventDefault(); this.setZoom(1); return; }
         const k = e.key.toLowerCase();
         if (k === 'c') { e.preventDefault(); this.copySelected(); return; }
         if (k === 'x') { e.preventDefault(); this.cutSelected(); return; }
@@ -264,149 +341,171 @@ pasteFromClipboard(){
       if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(e.key.toLowerCase())) {
         return; // Let CommandManager handle these
       }
-      
-      if(!this.selected.length) return;
-      const isArrow=['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key);
-      if(isArrow || e.key==='Delete') e.preventDefault();
-      const stepX = e.shiftKey ? (this.gridPct().x || pxToPct(8,this.stageEl.clientWidth)) : pxToPct(1, this.stageEl.clientWidth);
-      const stepY = e.shiftKey ? (this.gridPct().y || pxToPct(8,this.stageEl.clientHeight)) : pxToPct(1, this.stageEl.clientHeight);
+
+      if (!this.selected.length) return;
+      const isArrow = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key);
+      if (isArrow || e.key === 'Delete') e.preventDefault();
+      const stepX = e.shiftKey ? (this.gridPct().x || pxToPct(8, this.stageEl.clientWidth)) : pxToPct(1, this.stageEl.clientWidth);
+      const stepY = e.shiftKey ? (this.gridPct().y || pxToPct(8, this.stageEl.clientHeight)) : pxToPct(1, this.stageEl.clientHeight);
       const useSnap = e.shiftKey;
-      switch(e.key){
+      switch (e.key) {
         case 'Delete': this.deleteSelectedWithCommand(); break;
-        case 'ArrowLeft':  this.nudge(-stepX, 0, {snap:useSnap}); break;
-        case 'ArrowRight': this.nudge( stepX, 0, {snap:useSnap}); break;
-        case 'ArrowUp':    this.nudge( 0, -stepY, {snap:useSnap}); break;
-        case 'ArrowDown':  this.nudge( 0,  stepY, {snap:useSnap}); break;
+        case 'ArrowLeft': this.nudge(-stepX, 0, { snap: useSnap }); break;
+        case 'ArrowRight': this.nudge(stepX, 0, { snap: useSnap }); break;
+        case 'ArrowUp': this.nudge(0, -stepY, { snap: useSnap }); break;
+        case 'ArrowDown': this.nudge(0, stepY, { snap: useSnap }); break;
       }
     }, true);
   }
-  onElementChanged(){ if(!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce=setTimeout(()=> this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
-  nudge(dx,dy,opts={snap:false}){
-    if (!this.selected.length) return;
-    
-    const grid=this.gridPct();
-    
-    // Calculate final positions with constraints
-    const finalDx = dx, finalDy = dy;
+  onElementChanged() { if (!this.stepMgr?.activeStep) return; clearTimeout(this._thumbDebounce); this._thumbDebounce = setTimeout(() => this.stepMgr.scheduleThumb(this.stepMgr.activeStep), 200); }
+  nudge(dx, dy, opts = { snap: false }) {
+    // Bersagli: selezione se presente, altrimenti il top-most (ultimo aggiunto)
+    const targets = this.selected.length
+      ? [...this.selected]
+      : (this.elements.length ? [this.elements[this.elements.length - 1]] : []);
+
+    if (!targets.length) return;
+
+    const grid = this.gridPct();
+    const snapEnabled = !!opts.snap && (this.grid || 0) > 0;
+
+    const finalDx = dx;   // dx,dy sono in PUNTI PERCENTUALI
+    const finalDy = dy;
+
+    // Verifica che tutti possano muoversi senza clamp (evita movimenti "a metà")
     let canMove = true;
-    
-    // Check if all elements can move to new positions
-    this.selected.forEach(el => {
-      let nx = el.x + finalDx, ny = el.y + finalDy;
-      if (opts.snap) {
+    for (const el of targets) {
+      let nx = el.x + finalDx;
+      let ny = el.y + finalDy;
+
+      if (snapEnabled) {
         nx = snapTo(nx, grid.x);
         ny = snapTo(ny, grid.y);
       }
-      nx = Math.max(0, Math.min(100 - el.w, nx));
-      ny = Math.max(0, Math.min(100 - el.h, ny));
-      
-      // If position would be clamped, adjust the delta
-      if (Math.abs(nx - (el.x + finalDx)) > 0.01 || Math.abs(ny - (el.y + finalDy)) > 0.01) {
+
+      // limiti canvas
+      const clampedX = Math.max(0, Math.min(100 - el.w, nx));
+      const clampedY = Math.max(0, Math.min(100 - el.h, ny));
+
+      // se servirebbe clampare, annulliamo il nudge di gruppo
+      if (Math.abs(clampedX - nx) > 0.01 || Math.abs(clampedY - ny) > 0.01) {
         canMove = false;
+        break;
       }
-    });
-    
-    if (canMove) {
-      const cmd = new MoveElementsCommand(this, this.selected, finalDx, finalDy, 'Sposta elementi');
-      this.commandMgr.executeCommand(cmd);
+    }
+
+    if (!canMove) return;
+
+    // Esegui come UNICO comando (copre 1 o N elementi)
+    const cmd = new MoveElementsCommand(this, targets, finalDx, finalDy, 'Sposta elementi (nudge)');
+    this.commandMgr.executeCommand(cmd);
+
+    // Se non c'era selezione, metti in selezione il target di default per coerenza con i test
+    if (!this.selected.length && targets.length === 1) {
+      this.selectOnly(targets[0]);
     }
   }
-  seedPalette(){
-    const items=[ 
-      {type:'label',title:'Etichetta di testo',klass:LabelElement}, 
-      {type:'image',title:'Immagine',klass:ImageElement}, 
-      {type:'textbox',title:'Casella di testo',klass:TextBoxElement}, 
-      {type:'checkbox',title:'Checkbox',klass:CheckboxElement}, 
-      {type:'radiogroup',title:'Opzioni (radio)',klass:RadioGroupElement} 
+
+  seedPalette() {
+    const items = [
+      { type: 'label', title: 'Etichetta di testo', klass: LabelElement },
+      { type: 'image', title: 'Immagine', klass: ImageElement },
+      { type: 'textbox', title: 'Casella di testo', klass: TextBoxElement },
+      { type: 'checkbox', title: 'Checkbox', klass: CheckboxElement },
+      { type: 'radiogroup', title: 'Opzioni (radio)', klass: RadioGroupElement }
     ];
-    this.registry=new Map(items.map(i=>[i.type,i]));
-    items.forEach(i=>{ const b=document.createElement('button'); b.type='button'; b.className='btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable=true; b.dataset.type=i.type; b.innerHTML=`<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart',(e)=> e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', ()=>{ const el=this.createElementByType(i.type); const cmd = new AddElementCommand(this, el, `Aggiungi ${i.type}`); this.commandMgr.executeCommand(cmd); }); this.palette.appendChild(b); });
+    this.registry = new Map(items.map(i => [i.type, i]));
+    items.forEach(i => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-outline-light btn-sm w-100 text-start palette-item'; b.draggable = true; b.dataset.type = i.type; b.innerHTML = `<strong>${i.title}</strong><div class="small text-secondary">${i.type}</div>`; b.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', i.type)); b.addEventListener('click', () => { const el = this.createElementByType(i.type); const cmd = new AddElementCommand(this, el, `Aggiungi ${i.type}`); this.commandMgr.executeCommand(cmd); }); this.palette.appendChild(b); });
   }
-  createElementByType(type){ const meta=this.registry.get(type); return meta? new meta.klass():null; }
-  clearSelection(){ this.selected.forEach(e=>e.setSelected(false)); this.selected=[]; this.renderPropPanel(); }
-  toggleSelect(el){ const i=this.selected.indexOf(el); if(i>=0){ this.selected.splice(i,1); el.setSelected(false);} else { this.selected.push(el); el.setSelected(true);} this.renderPropPanel(); }
-  selectOnly(el){ this.clearSelection(); if(el){ this.selected=[el]; el.setSelected(true);} this.renderPropPanel(); }
-  selectInclude(el){ if(!this.selected.includes(el)) this.selected.push(el); el.setSelected(true); this.renderPropPanel(); }
-  reflectSelection(){ if(this.selected.length!==1) { this.renderPropPanel(); return; } const sel=this.selected[0]; $$('#propForm [data-prop]').forEach(inp=>{ const k=inp.dataset.prop; if(['x','y','w','h','z','fontSize'].includes(k)) inp.value= sel[k]; if(k==='lockRatio') inp.checked=!!sel.lockRatio; }); }
-  deleteSelected(){ this.selected.forEach(s=>{ s.dom.remove(); this.elements=this.elements.filter(e=>e!==s); }); this.clearSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
-  deleteSelectedWithCommand(){ 
+  createElementByType(type) { const meta = this.registry.get(type); return meta ? new meta.klass() : null; }
+  clearSelection() { this.selected.forEach(e => e.setSelected(false)); this.selected = []; this.renderPropPanel(); }
+  toggleSelect(el) { const i = this.selected.indexOf(el); if (i >= 0) { this.selected.splice(i, 1); el.setSelected(false); } else { this.selected.push(el); el.setSelected(true); } this.renderPropPanel(); }
+  selectOnly(el) { this.clearSelection(); if (el) { this.selected = [el]; el.setSelected(true); } this.renderPropPanel(); }
+  selectInclude(el) { if (!this.selected.includes(el)) this.selected.push(el); el.setSelected(true); this.renderPropPanel(); }
+  reflectSelection() { if (this.selected.length !== 1) { this.renderPropPanel(); return; } const sel = this.selected[0]; $$('#propForm [data-prop]').forEach(inp => { const k = inp.dataset.prop; if (['x', 'y', 'w', 'h', 'z', 'fontSize'].includes(k)) inp.value = sel[k]; if (k === 'lockRatio') inp.checked = !!sel.lockRatio; }); }
+  deleteSelected() { this.selected.forEach(s => { s.dom.remove(); this.elements = this.elements.filter(e => e !== s); }); this.clearSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
+  deleteSelectedWithCommand() {
     if (!this.selected.length) return;
     const cmd = new DeleteElementsCommand(this, this.selected, 'Elimina elementi');
     this.commandMgr.executeCommand(cmd);
   }
-  renderPropPanel(){ const f=this.propForm; f.innerHTML='';
-    if(!this.selected.length){
-      const step=this.stepMgr?.activeStep; if(!step){ f.innerHTML='<div class="text-secondary small">Nessuno step attivo</div>'; return; }
-      const wrap=document.createElement('div');
-      wrap.innerHTML=`<div class="mb-2"><label class="form-label small">Titolo step</label><input id="stepName" class="form-control form-control-sm" type="text" value="${step.name}"></div>
+  renderPropPanel() {
+    const f = this.propForm; f.innerHTML = '';
+    if (!this.selected.length) {
+      const step = this.stepMgr?.activeStep; if (!step) { f.innerHTML = '<div class="text-secondary small">Nessuno step attivo</div>'; return; }
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class="mb-2"><label class="form-label small">Titolo step</label><input id="stepName" class="form-control form-control-sm" type="text" value="${step.name}"></div>
       <div class="mb-2"><label class="form-label small">Orientamento</label><select id="stepOrient" class="form-select form-select-sm"><option value="landscape">16:9</option><option value="portrait">9:16</option></select></div>
-      <div class="mb-2"><label class="form-label small">Sfondo (URL)</label><input id="stepBg" class="form-control form-control-sm" type="url" value="${step.bgUrl||''}" placeholder="https://…/img.jpg"></div>`;
+      <div class="mb-2"><label class="form-label small">Sfondo (URL)</label><input id="stepBg" class="form-control form-control-sm" type="url" value="${step.bgUrl || ''}" placeholder="https://…/img.jpg"></div>`;
       f.appendChild(wrap);
-      $('#stepOrient',wrap).value = step.orient;
-      $('#stepName',wrap).addEventListener('input', e=>{ step.name=e.target.value||step.name; this.stepMgr.render(); });
-      $('#stepOrient',wrap).addEventListener('change', e=>{ step.orient=e.target.value; this.changeOrientation(step.orient); this.stepMgr.render(); });
-      $('#stepBg',wrap).addEventListener('change', e=>{ step.bgUrl=e.target.value.trim(); this.setBackground(step.bgUrl); this.stepMgr.scheduleThumb(step); });
+      $('#stepOrient', wrap).value = step.orient;
+      $('#stepName', wrap).addEventListener('input', e => { step.name = e.target.value || step.name; this.stepMgr.render(); });
+      $('#stepOrient', wrap).addEventListener('change', e => { step.orient = e.target.value; this.changeOrientation(step.orient); this.stepMgr.render(); });
+      $('#stepBg', wrap).addEventListener('change', e => { step.bgUrl = e.target.value.trim(); this.setBackground(step.bgUrl); this.stepMgr.scheduleThumb(step); });
       return;
     }
-    if(this.selected.length>1){ f.innerHTML='<div class="text-secondary small">Selezionati: '+this.selected.length+' elementi</div>'; return; }
-    const el=this.selected[0]; const schema=el.getPropSchema();
-    const header=document.createElement('div'); header.className='d-flex justify-content-between align-items-center mb-1'; header.innerHTML=`<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
-    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete',header).addEventListener('click',(e)=>{ e.preventDefault(); this.selectOnly(el); this.deleteSelectedWithCommand(); });
-    schema.forEach(def=>{ const row=document.createElement('div'); row.className='mb-2'; const id=Editor.uid('prop'); const label=document.createElement('label'); label.className='form-label small'; label.htmlFor=id; label.textContent=def.label; let input;
-      if(def.type==='textarea'){ input=document.createElement('textarea'); input.className='form-control form-control-sm'; input.rows=2; }
-      else if(def.type==='select'){ input=document.createElement('select'); input.className='form-select form-select-sm'; def.options.forEach(([v,lab])=>{ const o=document.createElement('option'); o.value=v; o.textContent=lab; input.appendChild(o); }); }
-      else if(def.type==='checkbox'){ input=document.createElement('input'); input.type='checkbox'; input.className='form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id=id; input.dataset.prop=def.key; input.checked=!!el[def.key]; input.addEventListener('input', ()=>{ el[def.key]=input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
-      else{ input=document.createElement('input'); input.type=def.type||'text'; input.className='form-control form-control-sm'; if(def.min!=null) input.min=def.min; }
-      input.id=id; input.dataset.prop=def.key; let v=el[def.key]; if(def.key==='options') v=el.options.join(';'); if(def.type!=='checkbox') input.value = v ?? '';
-      input.addEventListener('input', ()=>{ 
+    if (this.selected.length > 1) { f.innerHTML = '<div class="text-secondary small">Selezionati: ' + this.selected.length + ' elementi</div>'; return; }
+    const el = this.selected[0]; const schema = el.getPropSchema();
+    const header = document.createElement('div'); header.className = 'd-flex justify-content-between align-items-center mb-1'; header.innerHTML = `<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
+    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete', header).addEventListener('click', (e) => { e.preventDefault(); this.selectOnly(el); this.deleteSelectedWithCommand(); });
+    schema.forEach(def => {
+      const row = document.createElement('div'); row.className = 'mb-2'; const id = Editor.uid('prop'); const label = document.createElement('label'); label.className = 'form-label small'; label.htmlFor = id; label.textContent = def.label; let input;
+      if (def.type === 'textarea') { input = document.createElement('textarea'); input.className = 'form-control form-control-sm'; input.rows = 2; }
+      else if (def.type === 'select') { input = document.createElement('select'); input.className = 'form-select form-select-sm'; def.options.forEach(([v, lab]) => { const o = document.createElement('option'); o.value = v; o.textContent = lab; input.appendChild(o); }); }
+      else if (def.type === 'checkbox') { input = document.createElement('input'); input.type = 'checkbox'; input.className = 'form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id = id; input.dataset.prop = def.key; input.checked = !!el[def.key]; input.addEventListener('input', () => { el[def.key] = input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
+      else { input = document.createElement('input'); input.type = def.type || 'text'; input.className = 'form-control form-control-sm'; if (def.min != null) input.min = def.min; }
+      input.id = id; input.dataset.prop = def.key; let v = el[def.key]; if (def.key === 'options') v = el.options.join(';'); if (def.type !== 'checkbox') input.value = v ?? '';
+      input.addEventListener('input', () => {
         const oldVal = el[def.key];
-        let val=input.value; if(['x','y','w','h','fontSize','z'].includes(def.key)) val=Number(val||0); if(def.key==='options') val=val.split(';').map(s=>s.trim()).filter(Boolean); if(def.key==='z') val=Math.max(0,val); 
+        let val = input.value; if (['x', 'y', 'w', 'h', 'fontSize', 'z'].includes(def.key)) val = Number(val || 0); if (def.key === 'options') val = val.split(';').map(s => s.trim()).filter(Boolean); if (def.key === 'z') val = Math.max(0, val);
         const cmd = new ChangePropertyCommand(this, el, def.key, val, oldVal, `Modifica ${def.label.toLowerCase()}`);
         this.commandMgr.executeCommand(cmd);
       });
-      row.appendChild(label); row.appendChild(input); f.appendChild(row); });
+      row.appendChild(label); row.appendChild(input); f.appendChild(row);
+    });
   }
-  execCommand(cmd){ const sel=[...this.selected]; if(sel.length<1) return; const bbox={ minX:Math.min(...sel.map(e=>e.x)), maxX:Math.max(...sel.map(e=>e.x+e.w)), minY:Math.min(...sel.map(e=>e.y)), maxY:Math.max(...sel.map(e=>e.y+e.h)) };
-    const centerX=(bbox.minX+bbox.maxX)/2, centerY=(bbox.minY+bbox.maxY)/2;
-    switch(cmd){
-      case 'align-left': sel.forEach(e=>{ e.x=bbox.minX; e.applyTransform();}); break;
-      case 'align-right': sel.forEach(e=>{ e.x=bbox.maxX - e.w; e.applyTransform();}); break;
-      case 'align-hcenter': sel.forEach(e=>{ e.x = centerX - e.w/2; e.applyTransform();}); break;
-      case 'align-top': sel.forEach(e=>{ e.y=bbox.minY; e.applyTransform();}); break;
-      case 'align-bottom': sel.forEach(e=>{ e.y=bbox.maxY - e.h; e.applyTransform();}); break;
-      case 'align-vcenter': sel.forEach(e=>{ e.y = centerY - e.h/2; e.applyTransform();}); break;
-      case 'dist-h': this.distribute(sel,'x','w'); break;
-      case 'dist-v': this.distribute(sel,'y','h'); break;
-      case 'front': sel.forEach(e=>{ e.z = Math.max(...this.elements.map(x=>x.z))+1; e.applyTransform();}); break;
-      case 'back': sel.forEach(e=>{ e.z = Math.max(0, (e.z|0) - 1); e.applyTransform();}); break;
+  execCommand(cmd) {
+    const sel = [...this.selected]; if (sel.length < 1) return; const bbox = { minX: Math.min(...sel.map(e => e.x)), maxX: Math.max(...sel.map(e => e.x + e.w)), minY: Math.min(...sel.map(e => e.y)), maxY: Math.max(...sel.map(e => e.y + e.h)) };
+    const centerX = (bbox.minX + bbox.maxX) / 2, centerY = (bbox.minY + bbox.maxY) / 2;
+    switch (cmd) {
+      case 'align-left': sel.forEach(e => { e.x = bbox.minX; e.applyTransform(); }); break;
+      case 'align-right': sel.forEach(e => { e.x = bbox.maxX - e.w; e.applyTransform(); }); break;
+      case 'align-hcenter': sel.forEach(e => { e.x = centerX - e.w / 2; e.applyTransform(); }); break;
+      case 'align-top': sel.forEach(e => { e.y = bbox.minY; e.applyTransform(); }); break;
+      case 'align-bottom': sel.forEach(e => { e.y = bbox.maxY - e.h; e.applyTransform(); }); break;
+      case 'align-vcenter': sel.forEach(e => { e.y = centerY - e.h / 2; e.applyTransform(); }); break;
+      case 'dist-h': this.distribute(sel, 'x', 'w'); break;
+      case 'dist-v': this.distribute(sel, 'y', 'h'); break;
+      case 'front': sel.forEach(e => { e.z = Math.max(...this.elements.map(x => x.z)) + 1; e.applyTransform(); }); break;
+      case 'back': sel.forEach(e => { e.z = Math.max(0, (e.z | 0) - 1); e.applyTransform(); }); break;
     }
     this.reflectSelection(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep);
   }
-  distribute(sel, axis, sizeKey){ sel.sort((a,b)=> a[axis]-b[axis]); const first=sel[0], last=sel[sel.length-1]; const start=first[axis], end=last[axis] + last[sizeKey]; const total=sel.reduce((s,e)=> s+e[sizeKey], 0); const gaps=sel.length-1; const space=(end-start-total)/gaps; let pos=start; sel.forEach((e,i)=>{ if(i===0) { pos=e[axis]+e[sizeKey]; return; } e[axis]=pos; e.applyTransform(); pos += e[sizeKey] + space; }); }
-  exportHTML(){
-    const orient=this.stageEl.dataset.orient; const clone=this.canvas.cloneNode(true);
-    $$('.el', clone).forEach(n=>{ n.classList.remove('selected'); $$('.handles',n).forEach(h=>h.remove()); n.removeAttribute('data-type'); });
-    const wrapper=document.createElement('div'); wrapper.style.position='relative'; wrapper.style.width='100%'; wrapper.style.aspectRatio = orient==='portrait'? '9/16':'16/9'; wrapper.appendChild(clone);
-    const html = wrapper.outerHTML.trim(); const blob=new Blob([html],{type:'text/html;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='step.html'; a.click(); setTimeout(()=>URL.revokeObjectURL(url), 1000);
+  distribute(sel, axis, sizeKey) { sel.sort((a, b) => a[axis] - b[axis]); const first = sel[0], last = sel[sel.length - 1]; const start = first[axis], end = last[axis] + last[sizeKey]; const total = sel.reduce((s, e) => s + e[sizeKey], 0); const gaps = sel.length - 1; const space = (end - start - total) / gaps; let pos = start; sel.forEach((e, i) => { if (i === 0) { pos = e[axis] + e[sizeKey]; return; } e[axis] = pos; e.applyTransform(); pos += e[sizeKey] + space; }); }
+  exportHTML() {
+    const orient = this.stageEl.dataset.orient; const clone = this.canvas.cloneNode(true);
+    $$('.el', clone).forEach(n => { n.classList.remove('selected'); $$('.handles', n).forEach(h => h.remove()); n.removeAttribute('data-type'); });
+    const wrapper = document.createElement('div'); wrapper.style.position = 'relative'; wrapper.style.width = '100%'; wrapper.style.aspectRatio = orient === 'portrait' ? '9/16' : '16/9'; wrapper.appendChild(clone);
+    const html = wrapper.outerHTML.trim(); const blob = new Blob([html], { type: 'text/html;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'step.html'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  loadStep(step){
-    this.elements.forEach(e=> e.unmount()); this.clearSelection();
+  loadStep(step) {
+    this.elements.forEach(e => e.unmount()); this.clearSelection();
     this.elements = step.items;
-    this.changeOrientation(step.orient, {syncToolbar:true, suppressRender:true});
-    this.setBackground(step.bgUrl, {suppressThumb:true});
-    this.canvas.innerHTML='';
-    this.elements.forEach(e=> e.mount(this.canvas));
+    this.changeOrientation(step.orient, { syncToolbar: true, suppressRender: true });
+    this.setBackground(step.bgUrl, { suppressThumb: true });
+    this.canvas.innerHTML = '';
+    this.elements.forEach(e => e.mount(this.canvas));
     this.layoutStage();
     this.renderPropPanel();
   }
-  changeOrientation(orient, opts={}){
-    this.stageEl.dataset.orient = orient==='portrait' ? 'portrait' : 'landscape';
-    if(opts.syncToolbar){ $('#orientLandscape').checked = orient!=='portrait'; $('#orientPortrait').checked = orient==='portrait'; }
+  changeOrientation(orient, opts = {}) {
+    this.stageEl.dataset.orient = orient === 'portrait' ? 'portrait' : 'landscape';
+    if (opts.syncToolbar) { $('#orientLandscape').checked = orient !== 'portrait'; $('#orientPortrait').checked = orient === 'portrait'; }
     this.layoutStage();
-    if(this.stepMgr?.activeStep){ this.stepMgr.activeStep.orient=this.stageEl.dataset.orient; if(!opts.suppressRender) this.stepMgr.render(); }
+    if (this.stepMgr?.activeStep) { this.stepMgr.activeStep.orient = this.stageEl.dataset.orient; if (!opts.suppressRender) this.stepMgr.render(); }
   }
-  setBackground(url, opts={}){
-    this.canvas.style.background = url? `center/cover no-repeat url('${url}')` : '';
-    if(this.stepMgr?.activeStep){ this.stepMgr.activeStep.bgUrl=url||''; if(!opts.suppressThumb) this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
+  setBackground(url, opts = {}) {
+    this.canvas.style.background = url ? `center/cover no-repeat url('${url}')` : '';
+    if (this.stepMgr?.activeStep) { this.stepMgr.activeStep.bgUrl = url || ''; if (!opts.suppressThumb) this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }
   }
 }
