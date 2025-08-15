@@ -1,0 +1,295 @@
+/**
+ * Thumbnail Styles - Step thumbnails and categories
+ */
+
+/* === STEP CATEGORIES === */
+.cat {
+  border-top: 1px dashed var(--color-panel-border);
+  padding-top: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.cat:first-child {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+.cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  padding: var(--space-xs);
+  border-radius: var(--border-radius-sm);
+  transition: var(--transition-colors);
+}
+
+.cat-head:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cat-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--color-fg);
+}
+
+.cat-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.cat-actions .btn {
+  padding: var(--space-xs) calc(var(--space-xs) * 1.5);
+  font-size: var(--font-size-xs);
+}
+
+.cat-body {
+  margin-top: var(--space-sm);
+}
+
+/* === STEPS TOOLBAR === */
+.steps-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.steps-toolbar .btn {
+  padding: var(--space-xs) calc(var(--space-xs) * 1.5);
+  font-size: var(--font-size-xs);
+}
+
+/* === THUMBNAILS GRID === */
+.thumbs {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+
+/* === THUMBNAIL ITEMS === */
+.thumb {
+  position: relative;
+  background: var(--thumb-bg);
+  border: 1px solid var(--thumb-border);
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition-colors);
+}
+
+.thumb:hover {
+  background: color-mix(in srgb, var(--thumb-bg) 90%, white);
+  border-color: color-mix(in srgb, var(--thumb-border) 70%, white);
+}
+
+.thumb.active {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 1px;
+}
+
+/* === THUMBNAIL PREVIEW === */
+.thumb .mini {
+  position: relative;
+  height: var(--thumb-h);
+  width: calc(var(--thumb-h) * 16 / 9);
+  background: var(--canvas-bg);
+  margin: 0 auto;
+  border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+  overflow: hidden;
+}
+
+.thumb[data-orient="portrait"] .mini {
+  width: calc(var(--thumb-h) * 9 / 16);
+  height: var(--thumb-h);
+}
+
+.thumb .mini .mini-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* === THUMBNAIL LABELS === */
+.thumb .label {
+  font-size: var(--font-size-xs);
+  padding: var(--space-sm);
+  color: var(--color-fg-muted);
+  border-top: 1px solid var(--thumb-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  background: var(--thumb-bg);
+}
+
+.thumb .label .title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.thumb .label .title ._name {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thumb .label .title .badge {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-xs);
+  background: var(--color-badge-bg);
+  color: var(--color-badge-fg);
+  padding: calc(var(--space-xs) / 2) var(--space-xs);
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+}
+
+/* === THUMBNAIL ACTIONS === */
+.thumb .actions {
+  display: flex;
+  gap: var(--space-xs);
+  opacity: 0;
+  transition: var(--transition-opacity);
+}
+
+.thumb:hover .actions {
+  opacity: 1;
+}
+
+.thumb .actions .btn-icon {
+  border: 1px solid var(--thumb-border);
+  background: transparent;
+  color: var(--color-fg-muted);
+  padding: var(--space-xs);
+  border-radius: var(--border-radius-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition: var(--transition-colors);
+  font-size: var(--font-size-xs);
+}
+
+.thumb .actions .btn-icon:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-fg);
+  border-color: var(--color-fg-muted);
+}
+
+.thumb .actions .btn-icon.text-danger {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.thumb .actions .btn-icon.text-danger:hover {
+  background: rgba(220, 53, 69, 0.1);
+}
+
+/* === ADD THUMBNAIL === */
+.thumb.add .mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--canvas-bg) 95%, var(--selection-color));
+  border: 2px dashed var(--color-panel-border);
+}
+
+.thumb.add .mini::after {
+  content: "+";
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--selection-color);
+}
+
+.thumb.add:hover .mini {
+  background: color-mix(in srgb, var(--canvas-bg) 90%, var(--selection-color));
+  border-color: var(--selection-color);
+}
+
+.thumb.add:hover .mini::after {
+  color: color-mix(in srgb, var(--selection-color) 80%, white);
+}
+
+/* === RENAME INPUT === */
+.rename-input {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  color: var(--color-fg);
+  border-radius: var(--border-radius-sm);
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs);
+  width: 100%;
+  font-family: inherit;
+}
+
+.rename-input:focus {
+  outline: none;
+  border-color: var(--selection-color);
+  box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.25);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .thumbs {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .thumb .mini {
+    height: 60px;
+    width: calc(60px * 16 / 9);
+  }
+
+  .thumb[data-orient="portrait"] .mini {
+    width: calc(60px * 9 / 16);
+    height: 60px;
+  }
+
+  .thumb .label {
+    padding: var(--space-xs);
+    font-size: calc(var(--font-size-xs) * 0.9);
+  }
+
+  .thumb .actions {
+    opacity: 1; /* Always visible on mobile */
+  }
+}
+
+/* === ACCESSIBILITY === */
+.thumb:focus {
+  outline: none;
+}
+
+.thumb:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
+.cat-head:focus-visible {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .thumb {
+    border-width: 2px;
+  }
+
+  .thumb.active {
+    outline-width: 3px;
+  }
+}
+
+/* === PERFORMANCE === */
+.thumb {
+  contain: layout style paint;
+}
+
+.thumb .mini {
+  contain: layout;
+}

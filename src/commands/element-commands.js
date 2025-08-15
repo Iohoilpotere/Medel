@@ -5,56 +5,69 @@ import { getByPath, setByPath } from '../core/utils.js';
  * Command for adding an element to the canvas
  */
 export class AddElementCommand extends BaseCommand {
-  constructor(editor, element, description = 'Aggiungi elemento') {
-    super(editor, description);
+  constructor(editorApp, element, description = 'Aggiungi elemento') {
+    super(editorApp, description);
     this.element = element;
   }
 
   execute() {
+    const canvas = this.editor.view?.getStageElements()?.canvas;
+    if (!canvas) return;
+    
     if (!this.editor.elements.includes(this.element)) {
-      this.element.mount(this.editor.canvas);
+      this.element.mount(canvas);
       this.editor.elements.push(this.element);
       this.editor.selectOnly(this.element);
-      this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+      this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
     }
   }
 
   undo() {
     this.element.unmount();
-    this.editor.elements = this.editor.elements.filter(e => e !== this.element);
-    this.editor.clearSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    if (this.editor.stepManager?.activeStep) {
+      this.editor.stepManager.activeStep.items = this.editor.stepManager.activeStep.items.filter(e => e !== this.element);
+    }
+    this.editor.selectionManager?.clearSelection();
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 }
+
 export class AddElementsCommand extends BaseCommand {
-  constructor(editor, elements, description = 'Aggiungi elementi') {
-    super(editor, description);                 // ✅ chiamata a super PRIMA di usare this
+  constructor(editorApp, elements, description = 'Aggiungi elementi') {
+    super(editorApp, description);
     this.elements = [...elements];              // copia difensiva
   }
 
   execute() {
+    const canvas = this.editor.view?.getStageElements()?.canvas;
+    if (!canvas) return;
+    
     // porta i nuovi elementi sopra agli altri (z alto)
     const maxZ = Math.max(0, ...this.editor.elements.map(e => e.z | 0));
     this.elements.forEach((el, i) => {
       el.z = Math.max(el.z | 0, maxZ + 1 + i);
-      el.mount(this.editor.canvas);
-      this.editor.elements.push(el);
+      el.mount(canvas);
+      if (this.editor.stepManager?.activeStep) {
+        this.editor.stepManager.activeStep.items.push(el);
+      }
       el.setSelected(false);
     });
 
     // seleziona incollati
-    this.editor.clearSelection();
-    this.elements.forEach(el => this.editor.selectInclude(el));
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.selectionManager?.clearSelection();
+    this.elements.forEach(el => this.editor.selectionManager?.addToSelection(el));
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   undo() {
     this.elements.forEach(el => {
       el.unmount();
-      this.editor.elements = this.editor.elements.filter(e => e !== el);
+      if (this.editor.stepManager?.activeStep) {
+        this.editor.stepManager.activeStep.items = this.editor.stepManager.activeStep.items.filter(e => e !== el);
+      }
     });
-    this.editor.clearSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.selectionManager?.clearSelection();
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   canMergeWith() { return false; }
@@ -65,34 +78,44 @@ export class AddElementsCommand extends BaseCommand {
  * Command for deleting elements from the canvas
  */
 export class DeleteElementsCommand extends BaseCommand {
-  constructor(editor, elements, description = 'Elimina elementi') {
-    super(editor, description);
+  constructor(editorApp, elements, description = 'Elimina elementi') {
+    super(editorApp, description);
     this.elements = [...elements]; // Copy array
-    this.elementData = this.elements.map(el => ({
-      element: el,
-      index: editor.elements.indexOf(el)
-    }));
+    this.elementData = this.elements.map(el => {
+      const items = this.editor.stepManager?.activeStep?.items || [];
+      return {
+        element: el,
+        index: items.indexOf(el)
+      };
+    });
   }
 
   execute() {
     this.elements.forEach(element => {
       element.unmount();
-      this.editor.elements = this.editor.elements.filter(e => e !== element);
+      if (this.editor.stepManager?.activeStep) {
+        this.editor.stepManager.activeStep.items = this.editor.stepManager.activeStep.items.filter(e => e !== element);
+      }
     });
-    this.editor.clearSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.selectionManager?.clearSelection();
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   undo() {
+    const canvas = this.editor.view?.getStageElements()?.canvas;
+    if (!canvas) return;
+    
     this.elementData.forEach(({ element, index }) => {
-      element.mount(this.editor.canvas);
+      element.mount(canvas);
       // Insert at original position
-      this.editor.elements.splice(index, 0, element);
+      if (this.editor.stepManager?.activeStep) {
+        this.editor.stepManager.activeStep.items.splice(index, 0, element);
+      }
     });
-    this.editor.selected = [...this.elements];
+    
     this.elements.forEach(el => el.setSelected(true));
-    this.editor.renderPropPanel();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.elements.forEach(el => this.editor.selectionManager?.addToSelection(el));
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 }
 
@@ -100,8 +123,8 @@ export class DeleteElementsCommand extends BaseCommand {
  * Command for moving elements
  */
 export class MoveElementsCommand extends BaseCommand {
-  constructor(editor, elements, deltaX, deltaY, description = 'Sposta elementi') {
-    super(editor, description);
+  constructor(editorApp, elements, deltaX, deltaY, description = 'Sposta elementi') {
+    super(editorApp, description);
     this.elements = [...elements];
     this.deltaX = deltaX;
     this.deltaY = deltaY;
@@ -114,8 +137,8 @@ export class MoveElementsCommand extends BaseCommand {
       element.y += this.deltaY;
       element.applyTransform();
     });
-    this.editor.reflectSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.view?.updateSelectionUI?.(this.elements);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   undo() {
@@ -125,8 +148,8 @@ export class MoveElementsCommand extends BaseCommand {
       element.y = original.y;
       element.applyTransform();
     });
-    this.editor.reflectSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.view?.updateSelectionUI?.(this.elements);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   canMergeWith(otherCommand) {
@@ -150,8 +173,8 @@ export class MoveElementsCommand extends BaseCommand {
  * Command for resizing elements
  */
 export class ResizeElementsCommand extends BaseCommand {
-  constructor(editor, elements, newBounds, description = 'Ridimensiona elementi') {
-    super(editor, description);
+  constructor(editorApp, elements, newBounds, description = 'Ridimensiona elementi') {
+    super(editorApp, description);
     this.elements = [...elements];
     this.originalBounds = this.elements.map(el => ({
       x: el.x, y: el.y, w: el.w, h: el.h
@@ -165,8 +188,8 @@ export class ResizeElementsCommand extends BaseCommand {
       Object.assign(element, bounds);
       element.applyTransform();
     });
-    this.editor.reflectSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.view?.updateSelectionUI?.(this.elements);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   undo() {
@@ -175,8 +198,8 @@ export class ResizeElementsCommand extends BaseCommand {
       Object.assign(element, bounds);
       element.applyTransform();
     });
-    this.editor.reflectSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.editor.view?.updateSelectionUI?.(this.elements);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 }
 
@@ -184,8 +207,8 @@ export class ResizeElementsCommand extends BaseCommand {
  * Command for changing element properties
  */
 export class ChangePropertyCommand extends BaseCommand {
-  constructor(editor, element, property, newValue, oldValue, description = 'Modifica proprietà') {
-    super(editor, description);
+  constructor(editorApp, element, property, newValue, oldValue, description = 'Modifica proprietà') {
+    super(editorApp, description);
     this.element = element;
     this.property = property; // può essere "x" oppure "style.fontSize" ecc.
     this.newValue = newValue;
@@ -197,36 +220,30 @@ export class ChangePropertyCommand extends BaseCommand {
   }
 
   execute() {
-    const isNested = this.property.includes('.');
-    if (isNested) {
-      setByPath(this.element, this.property, this.newValue);
-      this.element.readProps?.();
-    } else {
-      this.element[this.property] = this.newValue;
-      if (this.#isTransformKey(this.property)) {
-        this.element.applyTransform();
-      } else {
-        this.element.readProps?.();
-      }
-    }
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
+    this.#applyValue(this.newValue);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
   }
 
   undo() {
+    this.#applyValue(this.oldValue);
+    this.editor.view?.updateSelectionUI?.([this.element]);
+    this.editor.stepManager?.scheduleThumb(this.editor.stepManager?.activeStep);
+  }
+
+  #applyValue(value) {
+    const { setByPath } = require('../core/utils/index.js');
     const isNested = this.property.includes('.');
     if (isNested) {
-      setByPath(this.element, this.property, this.oldValue);
+      setByPath(this.element, this.property, value);
       this.element.readProps?.();
     } else {
-      this.element[this.property] = this.oldValue;
+      this.element[this.property] = value;
       if (this.#isTransformKey(this.property)) {
         this.element.applyTransform();
       } else {
         this.element.readProps?.();
       }
     }
-    this.editor.reflectSelection();
-    this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
   }
 
   canMergeWith(otherCommand) {

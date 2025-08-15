@@ -4,8 +4,7 @@ import { $ } from '../core/utils.js';
  * Manages command history and provides undo/redo functionality
  */
 export default class CommandManager {
-  constructor(editor) {
-    this.editor = editor;
+  constructor() {
     this.history = [];
     this.currentIndex = -1;
     this.maxHistorySize = 100;

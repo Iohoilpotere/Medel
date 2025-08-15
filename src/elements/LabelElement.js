@@ -1,15 +1,8 @@
 import BaseElement from '../core/base-element.js';
+import { FONT_FAMILIES } from '../config/fonts.js';
 
 export default class LabelElement extends BaseElement {
-  static FONTS = [
-    ['system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', 'System'],
-    ['Inter, system-ui, sans-serif', 'Inter'],
-    ['Roboto, system-ui, sans-serif', 'Roboto'],
-    ['Arial, Helvetica, sans-serif', 'Arial'],
-    ['Georgia, serif', 'Georgia'],
-    ['"Times New Roman", Times, serif', 'Times New Roman'],
-    ['"Courier New", Courier, monospace', 'Courier New'],
-  ];
+  static FONTS = FONT_FAMILIES;
 
   getPropSchema() {
     return [
@@ -20,8 +13,11 @@ export default class LabelElement extends BaseElement {
 
       // Font family → select (niente doppia label)
       {
-        section: 'Tipografia', key: 'style.fontFamily', label: 'Font', type: 'select',
-        options: (this.constructor.FONTS || []).map(([v, l]) => [v, l])
+        section: 'Tipografia', 
+        key: 'style.fontFamily', 
+        label: 'Font', 
+        type: 'select',
+        options: FONT_FAMILIES.map(([v, l]) => [v, l])
       },
 
       // Dimensione + Unità (una riga sola: il gruppo porta la label "Dimensione")

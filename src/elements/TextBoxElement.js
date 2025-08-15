@@ -1,17 +1,9 @@
 // src/elements/TextBoxElement.js
 import BaseElement from '../core/base-element.js';
+import { FONT_FAMILIES } from '../config/fonts.js';
 
 export default class TextBoxElement extends BaseElement {
-  // stessa lista usata su Label; spostabile in config in seguito
-  static FONTS = [
-    ['system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif', 'System'],
-    ['Inter, system-ui, sans-serif', 'Inter'],
-    ['Roboto, system-ui, sans-serif', 'Roboto'],
-    ['Arial, Helvetica, sans-serif', 'Arial'],
-    ['Georgia, serif', 'Georgia'],
-    ['"Times New Roman", Times, serif', 'Times New Roman'],
-    ['"Courier New", Courier, monospace', 'Courier New'],
-  ];
+  static FONTS = FONT_FAMILIES;
 
   constructor() {
     super('textbox', 12, 40, 35, 8);
@@ -31,7 +23,7 @@ export default class TextBoxElement extends BaseElement {
       position: 'top',              // 'left'|'top'|'inline'
       gap: 6,                       // px tra label e campo
       style: {
-        fontFamily: TextBoxElement.FONTS[0][0],
+        fontFamily: FONT_FAMILIES[0][0],
         fontSize: 1.2,
         fontSizeUnit: 'vw',         // 'vw'|'px'|'%'
         fontWeight: 500,
@@ -45,7 +37,7 @@ export default class TextBoxElement extends BaseElement {
 
     // Stile del CAMPO (input/textarea)
     this.inputStyle = {
-      fontFamily: TextBoxElement.FONTS[0][0],
+      fontFamily: FONT_FAMILIES[0][0],
       fontSize: 1.2,
       fontSizeUnit: 'vw',
       fontWeight: 400,
@@ -160,7 +152,7 @@ export default class TextBoxElement extends BaseElement {
     field.style.padding = '6px 8px';
     field.style.boxSizing = 'border-box';
 
-    // --- Pattern: compila in sicurezza e imposta l’attributo solo se valido ---
+    // --- Pattern: compila in sicurezza e imposta l'attributo solo se valido ---
     const rawPattern = (this.pattern || '').trim();
     let body = '', flags = '', compiled = null;
 
@@ -237,8 +229,11 @@ export default class TextBoxElement extends BaseElement {
 
       // Tipografia etichetta
       {
-        section: 'Etichetta', key: 'label.style.fontFamily', label: 'Font', type: 'select',
-        options: (this.constructor.FONTS || []).map(([v, l]) => [v, l])
+        section: 'Etichetta', 
+        key: 'label.style.fontFamily', 
+        label: 'Font', 
+        type: 'select',
+        options: FONT_FAMILIES.map(([v, l]) => [v, l])
       },
 
       { section: 'Etichetta', group: 'font-size', key: 'label.style.fontSize', label: '', type: 'number', min: 0.1, step: 0.1 },
@@ -265,8 +260,11 @@ export default class TextBoxElement extends BaseElement {
 
       // ---------- Tipografia CAMPO ----------
       {
-        section: 'Tipografia campo', key: 'inputStyle.fontFamily', label: 'Font', type: 'select',
-        options: (this.constructor.FONTS || []).map(([v, l]) => [v, l])
+        section: 'Tipografia campo', 
+        key: 'inputStyle.fontFamily', 
+        label: 'Font', 
+        type: 'select',
+        options: FONT_FAMILIES.map(([v, l]) => [v, l])
       },
 
       { section: 'Tipografia campo', group: 'font-size', key: 'inputStyle.fontSize', label: '', type: 'number', min: 0.1, step: 0.1 },

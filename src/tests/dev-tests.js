@@ -6,26 +6,36 @@ export function runTests(ed) {
   try {
     console.group('%cMedel Editor – Tests', 'color:#0d6efd');
 
-    const stage = ed.stageEl;
-    const outer = stage.parentElement;
+    const { stage, stageOuter: outer } = ed.view?.getStageElements() || {};
+    if (!stage || !outer) {
+      console.error('Stage elements not found');
+      return;
+    }
 
     // Salva orientamento corrente per ripristino
-    const prevOrient = ed.stageEl.dataset.orient || 'landscape';
+    const prevOrient = ed.metricsService?.getOrientation() || 'landscape';
 
     // Test proporzioni/orientamenti (non tocca gli step)
-    ed.changeOrientation('landscape', { syncToolbar: true });
+    ed.metricsService?.setOrientation('landscape');
+    ed.view?.syncOrientationControls('landscape');
     console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in landscape');
     console.assert(approx(stage.offsetWidth / stage.offsetHeight, 16 / 9, 0.08), 'Aspect ~ 16/9');
 
-    ed.changeOrientation('portrait', { syncToolbar: true });
+    ed.metricsService?.setOrientation('portrait');
+    ed.view?.syncOrientationControls('portrait');
     console.assert(stage.offsetWidth <= outer.clientWidth + 1 && stage.offsetHeight <= outer.clientHeight + 1, 'Stage fits in portrait');
     console.assert(approx(stage.offsetWidth / stage.offsetHeight, 9 / 16, 0.08), 'Aspect ~ 9/16');
 
     // Ripristina orientamento originale
-    ed.changeOrientation(prevOrient, { syncToolbar: true });
+    ed.metricsService?.setOrientation(prevOrient);
+    ed.view?.syncOrientationControls(prevOrient);
 
     // ====== ISOLAMENTO: usa uno STEP TEMPORANEO ======
-    const sm = ed.stepMgr;
+    const sm = ed.stepManager;
+    if (!sm) {
+      console.error('Step manager not found');
+      return;
+    }
 
     // Step/categoria precedenti (per ripristino)
     const prevStep = sm.activeStep;
@@ -36,21 +46,32 @@ export function runTests(ed) {
     sm.setActive(testStep);
 
     // ---- Test NUDGE su elemento reale ma temporaneo ----
-    const Klass = ed.registry.get('label').klass;
+    const Klass = ed.elementRegistry?.get('label')?.klass;
+    if (!Klass) {
+      console.error('Label element class not found');
+      return;
+    }
+    
     const testEl = new Klass();
-    testEl.mount(ed.canvas);          // crea DOM e listener
-    ed.elements.push(testEl);         // registra nello step attivo (testStep)
+    const canvas = ed.view?.getStageElements()?.canvas;
+    if (!canvas) {
+      console.error('Canvas not found');
+      return;
+    }
+    
+    testEl.mount(canvas);          // crea DOM e listener
+    testStep.items.push(testEl);         // registra nello step attivo (testStep)
     ed.selectOnly(testEl);            // selezione attiva
 
     const beforeX = testEl.x;
-    ed.nudge(1, 0, { snap: false });  // sposta di ~1% X
+    ed.nudgeSelected(1, 0, { snap: false });  // sposta di ~1% X
     console.assert(Math.abs(testEl.x - (beforeX + 1)) < 0.01, 'Nudge moves element by ~1% X');
 
     // ====== CLEANUP ROBUSTO ======
     // rimuovi elemento temporaneo
     testEl.unmount();
-    ed.elements = ed.elements.filter(e => e !== testEl);
-    ed.clearSelection();
+    testStep.items = testStep.items.filter(e => e !== testEl);
+    ed.selectionManager?.clearSelection();
 
     // rimuovi lo step temporaneo dalla categoria
     const idx = prevCat.steps.indexOf(testStep);

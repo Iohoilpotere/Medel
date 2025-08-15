@@ -1,11 +1,12 @@
 // src/core/base-element.js
-import { $, $$, clamp, snapTo, pxToPct, pctToPx, clientToStage } from './utils.js';
-import Editor from '../editor/editor.js';
+import { $, $$ } from './utils/index.js';
+import { clamp, pxToPct, clientToStage } from './utils/index.js';
 import { MoveElementsCommand, ResizeElementsCommand } from '../commands/element-commands.js';
+import { uid } from './utils/index.js';
 
 export default class BaseElement {
   constructor(type, x = 10, y = 10, w = 20, h = 10) {
-    this.id = Editor.uid(type);
+    this.id = uid(type);
     this.type = type;
 
     // Geometria / livello
@@ -57,7 +58,10 @@ export default class BaseElement {
       zIndex: this.z
     });
 
-    Editor.instance?.onElementChanged();
+    // Notify editor of changes through global instance
+    if (window.editorInstance?.onElementChanged) {
+      window.editorInstance.onElementChanged();
+    }
   }
 
   toJSON() {
@@ -110,17 +114,19 @@ export default class BaseElement {
 
       // Ctrl/Cmd: toggle selezione e non avviare il drag
       if (e.ctrlKey || e.metaKey) {
-        Editor.instance.toggleSelect(this);
+        window.editorInstance?.toggleSelect(this);
         return;
       }
 
       // Se non era selezionato: selezione singola
       if (!wasSelected) {
-        Editor.instance.selectOnly(this);
+        window.editorInstance?.selectOnly(this);
       }
 
-      const stage = Editor.instance.stageEl;
-      const startPx = clientToStage(e, stage);
+      const stage = window.editorInstance?.view?.getStageElements()?.stage;
+      if (!stage) return;
+      
+      const selected = [...(window.editorInstance?.selected || [])];
       const selected = [...Editor.instance.selected];
 
       // Snapshot posizioni iniziali
@@ -130,10 +136,11 @@ export default class BaseElement {
       const anchorStart = starts.find(o => o.s === this) || starts[0];
 
       // Snap alla griglia: attivo se grid>0 e Shift NON premuto
-      const grid = Editor.instance.gridPct();
+      const gridService = window.editorInstance?.gridSnapService;
+      const grid = gridService?.getGridPercent(stage) || { x: 0, y: 0 };
       const stepX = grid.x || 0;
       const stepY = grid.y || 0;
-      const snapEnabled = (Editor.instance.grid || 0) > 0 && !e.shiftKey;
+      const snapEnabled = gridService?.isEnabled() && !e.shiftKey;
 
       // Limiti di gruppo (delta ammesso)
       const dxMin = Math.max(...starts.map(o => -o.x));
@@ -182,7 +189,7 @@ export default class BaseElement {
           s.applyTransform();
         });
 
-        Editor.instance.reflectSelection();
+        window.editorInstance?.view?.updateSelectionUI?.(selected);
         moved = true;
       };
 
@@ -201,9 +208,8 @@ export default class BaseElement {
         // Ripristina preview e committa come comando
         starts.forEach(({ s, x, y }) => { s.x = x; s.y = y; s.applyTransform(); });
 
-        const cmd = new MoveElementsCommand(Editor.instance, selected, finalDx, finalDy, 'Sposta elementi');
-        Editor.instance.commandMgr.executeCommand(cmd);
-        Editor.instance.stepMgr.scheduleThumb(Editor.instance.stepMgr.activeStep);
+        const cmd = new MoveElementsCommand(window.editorInstance, selected, finalDx, finalDy, 'Sposta elementi');
+        window.editorInstance?.commandManager?.executeCommand(cmd);
       };
 
       window.addEventListener('mousemove', onMove);
@@ -219,20 +225,23 @@ export default class BaseElement {
       e.preventDefault();
 
       // assicurati che l'elemento sia nella selezione
-      if (!Editor.instance.selected.includes(this)) {
-        Editor.instance.selectInclude(this);
+      if (!window.editorInstance?.selected?.includes(this)) {
+        window.editorInstance?.selectInclude(this);
       }
 
       const dir = h.dataset.dir; // 'n','s','e','w','ne','se','sw','nw'
-      const stage = Editor.instance.stageEl;
+      const stage = window.editorInstance?.view?.getStageElements()?.stage;
+      if (!stage) return;
+      
       const start = clientToStage(e, stage);
 
-      const grid = Editor.instance.gridPct();
-      const snapEnabled = (Editor.instance.grid || 0) > 0;
+      const gridService = window.editorInstance?.gridSnapService;
+      const grid = gridService?.getGridPercent(stage) || { x: 0, y: 0 };
+      const snapEnabled = gridService?.isEnabled() || false;
       const stepX = grid.x || 0;
       const stepY = grid.y || 0;
 
-      const selected = [...Editor.instance.selected];
+      const selected = [...(window.editorInstance?.selected || [])];
       const multi = selected.length > 1;
       const isCorner = ['ne', 'se', 'sw', 'nw'].includes(dir);
 
@@ -319,6 +328,7 @@ export default class BaseElement {
           }
 
           Editor.instance.reflectSelection();
+          window.editorInstance?.view?.updateSelectionUI?.(selected);
         };
 
         const onUp = () => {
@@ -337,8 +347,8 @@ export default class BaseElement {
             o.s.applyTransform();
           });
 
-          const cmd = new ResizeElementsCommand(Editor.instance, selected, newBounds, 'Ridimensiona selezione (bordo allineato)');
-          Editor.instance.commandMgr.executeCommand(cmd);
+          const cmd = new ResizeElementsCommand(window.editorInstance, selected, newBounds, 'Ridimensiona selezione (bordo allineato)');
+          window.editorInstance?.commandManager?.executeCommand(cmd);
         };
 
         window.addEventListener('mousemove', onMove);
@@ -400,7 +410,7 @@ export default class BaseElement {
         this.w = R - L;
         this.h = B - T;
         this.applyTransform();
-        Editor.instance.reflectSelection();
+        window.editorInstance?.view?.updateSelectionUI?.([this]);
       };
 
       const onUpSingle = () => {
@@ -415,8 +425,8 @@ export default class BaseElement {
         this.h = B0 - T0;
         this.applyTransform();
 
-        const cmd = new ResizeElementsCommand(Editor.instance, [this], nb, 'Ridimensiona elemento');
-        Editor.instance.commandMgr.executeCommand(cmd);
+        const cmd = new ResizeElementsCommand(window.editorInstance, [this], nb, 'Ridimensiona elemento');
+        window.editorInstance?.commandManager?.executeCommand(cmd);
       };
 
       window.addEventListener('mousemove', onMoveSingle);

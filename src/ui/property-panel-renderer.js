@@ -2,9 +2,10 @@
  * Renders property panels with sections, groups, and various input types
  */
 
-import { $, createElement, clearElement } from '../core/utils/index.js';
-import { getByPath, setByPath } from '../core/utils/index.js';
-import { parseColor, formatRgba, hexToRgba } from '../core/utils/index.js';
+import { $ } from '../core/utils/index.js';
+import { createElement, clearElement } from '../core/utils/dom-helpers.js';
+import { getByPath, setByPath } from '../core/utils/object.js';
+import { parseColor, formatRgba, hexToRgba } from '../core/utils/color-helpers.js';
 
 export default class PropertyPanelRenderer {
   constructor(commandManager) {
@@ -502,15 +503,15 @@ export default class PropertyPanelRenderer {
    * @param {Array} elements
    */
   updateProperty(key, value, elements) {
-    if (!this.commandManager) return;
+    if (!this.commandManager || elements.length === 0) return;
 
     elements.forEach(element => {
       const oldValue = getByPath(element, key);
       
       if (oldValue !== value) {
-        const { ChangePropertyCommand } = require('../commands/element-commands.js');
+        const { ChangePropertyCommand } = await import('../commands/element-commands.js');
         const command = new ChangePropertyCommand(
-          { elements: this.currentElements }, // editor context
+          window.editorInstance, // editor context
           element,
           key,
           value,

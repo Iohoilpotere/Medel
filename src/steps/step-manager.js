@@ -3,8 +3,8 @@ import { Step, Category } from './step-models.js';
 import { AddStepCommand, DeleteStepCommand, ChangeStepPropertyCommand, AddCategoryCommand } from '../commands/step-commands.js';
 
 export default class StepManager {
-  constructor(editor) {
-    this.editor = editor;
+  constructor(editorApp) {
+    this.editorApp = editorApp;
     this.catsWrap = $('#stepsCats');
     this.btnAddCat = $('#btnAddCat');
     this.categories = [];
@@ -22,30 +22,35 @@ export default class StepManager {
 
   addCategoryWithCommand(name = 'Nuova categoria') {
     const c = new Category(name);
-    const cmd = new AddCategoryCommand(this.editor, c, 'Aggiungi categoria');
-    this.editor.commandMgr.executeCommand(cmd); // presuppone che editor.commandMgr esista
+    const cmd = new AddCategoryCommand(this.editorApp, c, 'Aggiungi categoria');
+    this.editorApp.commandManager?.executeCommand(cmd);
     return c;
   }
+  
   addStep(cat, name = 'Nuovo step') {
-    const s = new Step(name, this.editor.stageEl.dataset.orient || 'landscape');
-    s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
+    const orientation = this.editorApp.metricsService?.getOrientation() || 'landscape';
+    const s = new Step(name, orientation);
+    s.bgUrl = this.editorApp.backgroundService?.getCurrentUrl() || '';
     cat.steps.push(s); this.render(); return s;
   }
+  
   addStepWithCommand(cat, name = 'Nuovo step') {
-    const s = new Step(name, this.editor.stageEl.dataset.orient || 'landscape');
-    s.bgUrl = this.editor.canvas.style.background?.match(/url\('(.*)'\)/)?.[1] || '';
-    const cmd = new AddStepCommand(this.editor, cat, s, 'Aggiungi step');
-    this.editor.commandMgr.executeCommand(cmd);
+    const orientation = this.editorApp.metricsService?.getOrientation() || 'landscape';
+    const s = new Step(name, orientation);
+    s.bgUrl = this.editorApp.backgroundService?.getCurrentUrl() || '';
+    const cmd = new AddStepCommand(this.editorApp, cat, s, 'Aggiungi step');
+    this.editorApp.commandManager?.executeCommand(cmd);
     return s;
   }
+  
   duplicateStep(cat, step) {
     const copy = new Step(step.name + " (copia)", step.orient);
     copy.bgUrl = step.bgUrl;
 
     // ✅ clona ogni elemento passando da serialize/deserialize dell’Editor
     copy.items = step.items.map(el => {
-      const obj = this.editor.serializeElement(el);
-      const n = this.editor.deserializeElement(obj); // nuova istanza con tutte le props
+      const obj = this.editorApp.serializeElement(el);
+      const n = this.editorApp.deserializeElement(obj); // nuova istanza con tutte le props
       return n;
     });
 
@@ -56,10 +61,17 @@ export default class StepManager {
   }
 
   deleteStep(cat, step) {
-    const cmd = new DeleteStepCommand(this.editor, cat, step, 'Elimina step');
-    this.editor.commandMgr.executeCommand(cmd);
+    const cmd = new DeleteStepCommand(this.editorApp, cat, step, 'Elimina step');
+    this.editorApp.commandManager?.executeCommand(cmd);
   }
-  setActive(step) { if (!step) return; this.activeStep = step; this.editor.loadStep(step); this.render(); }
+  
+  setActive(step) { 
+    if (!step) return; 
+    this.activeStep = step; 
+    this.editorApp.loadStep(step); 
+    this.render(); 
+  }
+  
   scheduleThumb(step) { clearTimeout(this._thumbTimers.get(step?.id)); const t = setTimeout(() => { step._thumbNeedsUpdate = true; this.render(); }, 250); this._thumbTimers.set(step?.id, t); }
 
   render() {
