@@ -1,28 +1,111 @@
+// src/core/base-element.js
 import { $, $$, clamp, snapTo, pxToPct, pctToPx, clientToStage } from './utils.js';
 import Editor from '../editor/editor.js';
 import { MoveElementsCommand, ResizeElementsCommand } from '../commands/element-commands.js';
 
 export default class BaseElement {
   constructor(type, x = 10, y = 10, w = 20, h = 10) {
-    this.id = Editor.uid(type); this.type = type;
-    this.x = x; this.y = y; this.w = w; this.h = h;
-    this.rotation = 0; this.z = 1; this.lockRatio = false; this._ratio = w / h;
-    this.dom = null; this.selected = false;
-  }
-  createDom() { throw new Error('createDom must be implemented'); }
-  mount(parent) { if (!this.dom) this.createDom(); parent.appendChild(this.dom); this.applyTransform(); this.attachInteractivity(); }
-  unmount() { if (this.dom?.parentElement) { this.dom.parentElement.removeChild(this.dom); } }
-  applyTransform() { if (!this.dom) return; this.z = Math.max(0, this.z | 0); Object.assign(this.dom.style, { left: this.x + '%', top: this.y + '%', width: this.w + '%', height: this.h + '%', zIndex: this.z, position: 'absolute' }); Editor.instance?.onElementChanged(); }
-  toJSON() { return { id: this.id, type: this.type, x: this.x, y: this.y, w: this.w, h: this.h, rotation: this.rotation, z: this.z, lockRatio: this.lockRatio }; }
-  setSelected(sel) { this.selected = sel; if (!this.dom) return; this.dom.classList.toggle('selected', sel); if (sel) { this.ensureHandles(); } else { this.removeHandles(); } }
-  ensureHandles() { if ($('.handles', this.dom)) return; const box = document.createElement('div'); box.className = 'handles';['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(d => { const h = document.createElement('div'); h.dataset.dir = d; h.className = `handle ${d}`; h.dataset.editorUi = '1'; box.appendChild(h); }); this.dom.appendChild(box); }
-  removeHandles() { $$('.handles', this.dom).forEach(n => n.remove()); }
-  attachInteractivity() {
-    // Drag (singolo/multiplo) con SNAP attivo di default; Shift = disabilita snap
-    this.dom.addEventListener('mousedown', (e) => {
-      if (e.target.classList.contains('handle')) return;  // esclude i resize handle
+    this.id = Editor.uid(type);
+    this.type = type;
 
-      // --- Gestione selezione ---
+    // Geometria / livello
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.rotation = 0;
+    this.z = 1;
+    this.lockRatio = false;
+    this._ratio = w / h;
+
+    // DOM / stato
+    this.dom = null;
+    this.selected = false;
+
+    // Proprietà generali comuni a tutti gli elementi
+    this.tooltip = '';
+  }
+
+  createDom() {
+    throw new Error('createDom must be implemented');
+  }
+
+  mount(parent) {
+    if (!this.dom) this.createDom();
+    parent.appendChild(this.dom);
+    this.applyTransform();
+    this.attachInteractivity();
+    this.readProps(); // assicura che il tooltip (e altro) sia applicato
+  }
+
+  unmount() {
+    if (this.dom?.parentElement) {
+      this.dom.parentElement.removeChild(this.dom);
+    }
+  }
+
+  applyTransform() {
+    if (!this.dom) return;
+
+    this.z = Math.max(0, this.z | 0);
+    Object.assign(this.dom.style, {
+      position: 'absolute',
+      left: this.x + '%',
+      top: this.y + '%',
+      width: this.w + '%',
+      height: this.h + '%',
+      zIndex: this.z
+    });
+
+    Editor.instance?.onElementChanged();
+  }
+
+  toJSON() {
+    return {
+      id: this.id,
+      type: this.type,
+      x: this.x,
+      y: this.y,
+      w: this.w,
+      h: this.h,
+      rotation: this.rotation,
+      z: this.z,
+      lockRatio: this.lockRatio,
+      tooltip: this.tooltip
+    };
+  }
+
+  setSelected(sel) {
+    this.selected = sel;
+    if (!this.dom) return;
+    this.dom.classList.toggle('selected', sel);
+    if (sel) this.ensureHandles();
+    else this.removeHandles();
+  }
+
+  ensureHandles() {
+    if ($('.handles', this.dom)) return;
+    const box = document.createElement('div');
+    box.className = 'handles';
+    ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].forEach(d => {
+      const h = document.createElement('div');
+      h.dataset.dir = d;
+      h.className = `handle ${d}`;
+      h.dataset.editorUi = '1';
+      box.appendChild(h);
+    });
+    this.dom.appendChild(box);
+  }
+
+  removeHandles() {
+    $$('.handles', this.dom).forEach(n => n.remove());
+  }
+
+  attachInteractivity() {
+    // === Drag (singolo/multiplo) ===
+    this.dom.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('handle')) return; // esclude i resize handle
+
       const wasSelected = this.selected;
 
       // Ctrl/Cmd: toggle selezione e non avviare il drag
@@ -31,7 +114,7 @@ export default class BaseElement {
         return;
       }
 
-      // Se non era selezionato, selezione singola; se era già selezionato, lascia il gruppo com'è
+      // Se non era selezionato: selezione singola
       if (!wasSelected) {
         Editor.instance.selectOnly(this);
       }
@@ -43,22 +126,22 @@ export default class BaseElement {
       // Snapshot posizioni iniziali
       const starts = selected.map(s => ({ s, x: s.x, y: s.y, w: s.w, h: s.h }));
 
-      // Usa come "ancora" l'elemento cliccato (o il primo selezionato)
+      // Elemento ancora (quello cliccato o il primo selezionato)
       const anchorStart = starts.find(o => o.s === this) || starts[0];
 
-      // Griglia e snap: attivo di default quando grid > 0; Shift = disabilita
+      // Snap alla griglia: attivo se grid>0 e Shift NON premuto
       const grid = Editor.instance.gridPct();
       const stepX = grid.x || 0;
       const stepY = grid.y || 0;
       const snapEnabled = (Editor.instance.grid || 0) > 0 && !e.shiftKey;
 
-      // Limiti di gruppo per non uscire dal canvas (in delta)
+      // Limiti di gruppo (delta ammesso)
       const dxMin = Math.max(...starts.map(o => -o.x));
       const dxMax = Math.min(...starts.map(o => 100 - o.w - o.x));
       const dyMin = Math.max(...starts.map(o => -o.y));
       const dyMax = Math.min(...starts.map(o => 100 - o.h - o.y));
 
-      // Snap “dentro i limiti” su una griglia (snappa il TARGET assoluto)
+      // Snap “dentro i limiti” su una griglia (snappa il target assoluto)
       const snapInside = (target, step, minV, maxV) => {
         if (!snapEnabled || step <= 0) {
           return Math.min(maxV, Math.max(minV, target));
@@ -73,11 +156,12 @@ export default class BaseElement {
 
       const onMove = (ev) => {
         ev.preventDefault();
+
         const p = clientToStage(ev, stage);
         const dx = pxToPct(p.x - startPx.x, stage.clientWidth);
         const dy = pxToPct(p.y - startPx.y, stage.clientHeight);
 
-        // Calcola target assoluto dell'ANCORA e applica snap/clamp di gruppo
+        // Target dell’ancora (snap + clamp)
         let targetAx = anchorStart.x + dx;
         let targetAy = anchorStart.y + dy;
 
@@ -87,13 +171,15 @@ export default class BaseElement {
         const commonDx = targetAx - anchorStart.x;
         const commonDy = targetAy - anchorStart.y;
 
-        // Preview: stesso delta per tutti (mantiene i rapporti)
+        // Preview: stesso delta per tutti
         starts.forEach(({ s, x, y, w, h }) => {
           let nx = x + commonDx;
           let ny = y + commonDy;
           nx = clamp(nx, 0, 100 - w);
           ny = clamp(ny, 0, 100 - h);
-          s.x = nx; s.y = ny; s.applyTransform();
+          s.x = nx;
+          s.y = ny;
+          s.applyTransform();
         });
 
         Editor.instance.reflectSelection();
@@ -103,6 +189,7 @@ export default class BaseElement {
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
+
         if (!moved) return;
 
         // Delta finale rispetto all’ancora
@@ -111,7 +198,7 @@ export default class BaseElement {
         const finalDy = anchorNow.y - anchorStart.y;
         if (Math.abs(finalDx) < 1e-6 && Math.abs(finalDy) < 1e-6) return;
 
-        // Ripristina preview e committa come comando unico
+        // Ripristina preview e committa come comando
         starts.forEach(({ s, x, y }) => { s.x = x; s.y = y; s.applyTransform(); });
 
         const cmd = new MoveElementsCommand(Editor.instance, selected, finalDx, finalDy, 'Sposta elementi');
@@ -123,19 +210,20 @@ export default class BaseElement {
       window.addEventListener('mouseup', onUp);
     });
 
-    // === Resize: singolo con snap/lockRatio, multi con allineamento bordo comune ===
+    // === Resize (singolo con snap/ratio, multi con bordo comune) ===
     this.dom.addEventListener('mousedown', (e) => {
       const h = e.target.closest('.handle');
       if (!h) return;
+
       e.stopPropagation();
       e.preventDefault();
 
-      // assicurati che l'elemento sia dentro la selezione
+      // assicurati che l'elemento sia nella selezione
       if (!Editor.instance.selected.includes(this)) {
         Editor.instance.selectInclude(this);
       }
 
-      const dir = h.dataset.dir;                // 'n','s','e','w','ne','se','sw','nw'
+      const dir = h.dataset.dir; // 'n','s','e','w','ne','se','sw','nw'
       const stage = Editor.instance.stageEl;
       const start = clientToStage(e, stage);
 
@@ -148,10 +236,8 @@ export default class BaseElement {
       const multi = selected.length > 1;
       const isCorner = ['ne', 'se', 'sw', 'nw'].includes(dir);
 
-      // Minimi
       const MIN_W = 1, MIN_H = 1;
 
-      // Helpers
       const clampBox = (L, T, R, B) => {
         // min size
         if (R - L < MIN_W) { if (dir.includes('w')) L = R - MIN_W; else R = L + MIN_W; }
@@ -168,6 +254,7 @@ export default class BaseElement {
         if (B - T < MIN_H) B = T + MIN_H;
         return [L, T, R, B];
       };
+
       const snapInside = (v, step, minV, maxV) => {
         if (!snapEnabled || step <= 0) return Math.min(maxV, Math.max(minV, v));
         let s = Math.round(v / step) * step;
@@ -178,17 +265,13 @@ export default class BaseElement {
 
       let hasResized = false;
 
+      // === Multi-selezione: bordo allineato (niente corner) ===
       if (multi) {
-        // Multi-selezione: i corner non sono ammessi
         if (isCorner) return;
 
-        // Snapshot dei bordi iniziali di TUTTI
         const starts = selected.map(s => ({ s, L: s.x, T: s.y, R: s.x + s.w, B: s.y + s.h }));
-
-        // Bordi dell'elemento "ancora" (quello delle handle)
         const anchor = { L: this.x, T: this.y, R: this.x + this.w, B: this.y + this.h };
 
-        // Limiti di gruppo per il bordo che stiamo trascinando
         const lim = {
           e: { min: Math.max(...starts.map(o => o.L + MIN_W)), max: 100, step: stepX },
           w: { min: 0, max: Math.min(...starts.map(o => o.R - MIN_W)), step: stepX },
@@ -202,7 +285,6 @@ export default class BaseElement {
           const dx = pxToPct(p.x - start.x, stage.clientWidth);
           const dy = pxToPct(p.y - start.y, stage.clientHeight);
 
-          // target comune del bordo (allineamento)
           let target;
           if (dir === 'e') {
             target = snapInside(anchor.R + dx, lim.e.step, lim.e.min, lim.e.max);
@@ -246,9 +328,12 @@ export default class BaseElement {
 
           const newBounds = selected.map(s => ({ x: s.x, y: s.y, w: s.w, h: s.h }));
 
-          // ripristina preview -> commit comando
+          // ripristina preview
           starts.forEach(o => {
-            o.s.x = o.L; o.s.y = o.T; o.s.w = o.R - o.L; o.s.h = o.B - o.T;
+            o.s.x = o.L;
+            o.s.y = o.T;
+            o.s.w = o.R - o.L;
+            o.s.h = o.B - o.T;
             o.s.applyTransform();
           });
 
@@ -261,12 +346,13 @@ export default class BaseElement {
         return;
       }
 
-      // --- Singolo elemento (comportamento precedente, con snap/ratio) ---
+      // === Singolo elemento: snap/ratio ===
       const L0 = this.x, T0 = this.y, R0 = this.x + this.w, B0 = this.y + this.h;
       const aspect = this.w / this.h;
 
       const onMoveSingle = (ev) => {
         hasResized = true;
+
         const p = clientToStage(ev, stage);
         const dx = pxToPct(p.x - start.x, stage.clientWidth);
         const dy = pxToPct(p.y - start.y, stage.clientHeight);
@@ -278,7 +364,7 @@ export default class BaseElement {
         if (dir.includes('w')) L = L0 + dx;
         if (dir.includes('n')) T = T0 + dy;
 
-        // lockRatio o Shift = mantieni proporzioni (solo in selezione singola)
+        // lockRatio o Shift = mantieni proporzioni
         const keepRatio = this.lockRatio || ev.shiftKey;
         if (keepRatio) {
           let w = R - L, h = B - T;
@@ -309,7 +395,10 @@ export default class BaseElement {
           [L, T, R, B] = clampBox(L, T, R, B);
         }
 
-        this.x = L; this.y = T; this.w = R - L; this.h = B - T;
+        this.x = L;
+        this.y = T;
+        this.w = R - L;
+        this.h = B - T;
         this.applyTransform();
         Editor.instance.reflectSelection();
       };
@@ -320,7 +409,10 @@ export default class BaseElement {
         if (!hasResized) return;
 
         const nb = [{ x: this.x, y: this.y, w: this.w, h: this.h }];
-        this.x = L0; this.y = T0; this.w = R0 - L0; this.h = B0 - T0;
+        this.x = L0;
+        this.y = T0;
+        this.w = R0 - L0;
+        this.h = B0 - T0;
         this.applyTransform();
 
         const cmd = new ResizeElementsCommand(Editor.instance, [this], nb, 'Ridimensiona elemento');
@@ -330,20 +422,25 @@ export default class BaseElement {
       window.addEventListener('mousemove', onMoveSingle);
       window.addEventListener('mouseup', onUpSingle);
     });
-
-
-
-
   }
+
+  // Proprietà comuni (mostrate come sezione "Generale")
   getPropSchema() {
     return [
-      { key: 'x', label: 'X %', type: 'number', min: 0 },
-      { key: 'y', label: 'Y %', type: 'number', min: 0 },
-      { key: 'w', label: 'Larghezza %', type: 'number', min: 1 },
-      { key: 'h', label: 'Altezza %', type: 'number', min: 1 },
-      { key: 'z', label: 'Z-index', type: 'number', min: 0 },
-      { key: 'lockRatio', label: 'Blocca proporzioni', type: 'checkbox' }
+      { section: 'Generale', key: 'x',         label: 'X %',                type: 'number',  min: 0 },
+      { section: 'Generale', key: 'y',         label: 'Y %',                type: 'number',  min: 0 },
+      { section: 'Generale', key: 'w',         label: 'Larghezza %',        type: 'number',  min: 1 },
+      { section: 'Generale', key: 'h',         label: 'Altezza %',          type: 'number',  min: 1 },
+      { section: 'Generale', key: 'z',         label: 'Z-index',            type: 'number',  min: 0 },
+      { section: 'Generale', key: 'lockRatio', label: 'Blocca proporzioni', type: 'checkbox' },
+      { section: 'Generale', key: 'tooltip',   label: 'Tooltip',            type: 'text' }
     ];
   }
-  readProps() { }
+
+  // Applica le proprietà comuni; le sottoclassi dovrebbero chiamare super.readProps()
+  readProps() {
+    if (this.dom) {
+      this.dom.title = this.tooltip || '';
+    }
+  }
 }

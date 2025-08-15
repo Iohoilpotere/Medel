@@ -39,24 +39,22 @@ export default class StepManager {
     return s;
   }
   duplicateStep(cat, step) {
-    const copy = new Step(step.name + " (copia)", step.orient); copy.bgUrl = step.bgUrl;
-    step.items.forEach(el => {
-      const n = this.editor.createElementByType(el.type);
-      Object.assign(n, { x: el.x, y: el.y, w: el.w, h: el.h, z: el.z, rotation: el.rotation, lockRatio: el.lockRatio });
-      switch (el.type) {
-        case 'label': Object.assign(n, { text: el.text, fontSize: el.fontSize, color: el.color, align: el.align }); break;
-        case 'image': Object.assign(n, { src: el.src, alt: el.alt, fit: el.fit }); break;
-        case 'textbox': Object.assign(n, { placeholder: el.placeholder, name: el.name, align: el.align }); break;
-        case 'checkbox': Object.assign(n, { label: el.label, name: el.name, checked: el.checked }); break;
-        case 'radiogroup': Object.assign(n, { name: el.name, options: [...el.options], inline: el.inline }); break;
-      }
-      copy.items.push(n);
+    const copy = new Step(step.name + " (copia)", step.orient);
+    copy.bgUrl = step.bgUrl;
+
+    // ✅ clona ogni elemento passando da serialize/deserialize dell’Editor
+    copy.items = step.items.map(el => {
+      const obj = this.editor.serializeElement(el);
+      const n = this.editor.deserializeElement(obj); // nuova istanza con tutte le props
+      return n;
     });
+
     const idx = cat.steps.indexOf(step);
     cat.steps.splice(idx + 1, 0, copy);
     this.render();
     return copy;
   }
+
   deleteStep(cat, step) {
     const cmd = new DeleteStepCommand(this.editor, cat, step, 'Elimina step');
     this.editor.commandMgr.executeCommand(cmd);

@@ -1,4 +1,4 @@
-import { $, $$, clamp, uid, snapTo, pxToPct, pctToPx, clientToStage } from '../core/utils.js';
+import { $, $$, clamp, uid, snapTo, pxToPct, pctToPx, clientToStage, getByPath } from '../core/utils.js';
 import PanelManager from '../ui/panel-manager.js';
 import CaseExporter from './exporter.js';
 import StepManager from '../steps/step-manager.js';
@@ -9,6 +9,44 @@ import ImageElement from '../elements/ImageElement.js';
 import TextBoxElement from '../elements/TextBoxElement.js';
 import CheckboxElement from '../elements/CheckboxElement.js';
 import RadioGroupElement from '../elements/RadioGroupElement.js';
+import { ThemeFactory } from '../ui/themes/theme-factory.js';
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const is8 = h.length === 8;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const a = is8 ? parseInt(h.slice(6, 8), 16) / 255 : 1;
+  return { r, g, b, a };
+}
+function rgbToHex(r, g, b) {
+  const to2 = v => v.toString(16).padStart(2, '0');
+  return '#' + to2(r) + to2(g) + to2(b);
+}
+function parseColorToHexAlpha(str) {
+  if (!str) return { hex: '#000000', a: 1 };
+  str = String(str).trim().toLowerCase();
+  if (str.startsWith('rgba')) {
+    const m = str.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([0-9.]+)\)/);
+    if (m) { const r = +m[1], g = +m[2], b = +m[3], a = +m[4]; return { hex: rgbToHex(r, g, b), a }; }
+  }
+  if (str.startsWith('rgb')) {
+    const m = str.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (m) { const r = +m[1], g = +m[2], b = +m[3]; return { hex: rgbToHex(r, g, b), a: 1 }; }
+  }
+  if (str.startsWith('#')) {
+    const h = str.slice(1);
+    if (h.length === 6) { return { hex: str, a: 1 }; }
+    if (h.length === 8) { const { r, g, b, a } = hexToRgb(str); return { hex: rgbToHex(r, g, b), a }; }
+  }
+  return { hex: '#000000', a: 1 };
+}
+function composeColor(hex, a) {
+  const { r, g, b } = hexToRgb(hex + 'ff');
+  if (a >= 0.999) return hexToRgb(hex + 'ff') && hex; // puro hex senza alpha
+  return `rgba(${r}, ${g}, ${b}, ${Math.max(0, Math.min(1, a))})`;
+}
 
 export default class Editor {
   static instance;
@@ -33,6 +71,8 @@ export default class Editor {
     this.minZoom = 0.25;    // 25%
     this.maxZoom = 4;       // 400%
 
+    // Temi
+    ThemeFactory.init('dark'); // carica da localStorage se presente, altrimenti 'dark'
 
     // 1) Costruisci UI e bottoni undo/redo
     this.initUI();
@@ -59,16 +99,46 @@ export default class Editor {
   }
 
   serializeElement(el) {
-    const base = { type: el.type, x: el.x, y: el.y, w: el.w, h: el.h, z: el.z | 0, rotation: el.rotation || 0, lockRatio: !!el.lockRatio };
+    const base = {
+      type: el.type, x: el.x, y: el.y, w: el.w, h: el.h,
+      z: el.z | 0, rotation: el.rotation || 0, lockRatio: !!el.lockRatio,
+      tooltip: el.tooltip || ''
+    };
     switch (el.type) {
-      case 'label': Object.assign(base, { text: el.text, fontSize: el.fontSize, color: el.color, align: el.align }); break;
-      case 'image': Object.assign(base, { src: el.src, alt: el.alt, fit: el.fit }); break;
-      case 'textbox': Object.assign(base, { placeholder: el.placeholder, name: el.name, align: el.align }); break;
-      case 'checkbox': Object.assign(base, { label: el.label, name: el.name, checked: !!el.checked }); break;
-      case 'radiogroup': Object.assign(base, { name: el.name, options: [...(el.options || [])], inline: !!el.inline }); break;
+      case 'label':
+        Object.assign(base, {
+          text: el.text,
+          style: JSON.parse(JSON.stringify(el.style || {})),
+          wrap: el.wrap ?? 'normal',
+          maxLines: el.maxLines ?? null
+        });
+        break;
+      case 'image':
+        Object.assign(base, { src: el.src, alt: el.alt, fit: el.fit });
+        break;
+      case 'textbox':
+        Object.assign(base, {
+          name: el.name,
+          placeholder: el.placeholder,
+          align: el.align,
+          isPassword: !!el.isPassword,
+          multiline: !!el.multiline,
+          maxLength: el.maxLength ?? null,
+          pattern: el.pattern || '',
+          label: JSON.parse(JSON.stringify(el.label || {})),
+          inputStyle: JSON.parse(JSON.stringify(el.inputStyle || {})),
+        });
+        break;
+      case 'checkbox':
+        Object.assign(base, { label: el.label, name: el.name, checked: !!el.checked });
+        break;
+      case 'radiogroup':
+        Object.assign(base, { name: el.name, options: [...(el.options || [])], inline: !!el.inline });
+        break;
     }
     return base;
   }
+
   deserializeElement(obj, offset = { x: 0, y: 0 }) {
     const el = this.createElementByType(obj.type);
     // base
@@ -79,16 +149,56 @@ export default class Editor {
     el.z = obj.z | 0;
     el.rotation = obj.rotation || 0;
     el.lockRatio = !!obj.lockRatio;
+    el.tooltip = obj.tooltip || '';
+    
     // specifici
     switch (obj.type) {
-      case 'label': el.text = obj.text || el.text; el.fontSize = obj.fontSize ?? el.fontSize; el.color = obj.color || el.color; el.align = obj.align || el.align; break;
-      case 'image': el.src = obj.src || el.src; el.alt = obj.alt || el.alt; el.fit = obj.fit || el.fit; break;
-      case 'textbox': el.placeholder = obj.placeholder || el.placeholder; el.name = obj.name || el.name; el.align = obj.align || el.align; break;
-      case 'checkbox': el.label = obj.label || el.label; el.name = obj.name || el.name; el.checked = !!obj.checked; break;
-      case 'radiogroup': el.name = obj.name || el.name; el.options = [...(obj.options || el.options || [])]; el.inline = !!obj.inline; break;
+      case 'label':
+        el.text = obj.text ?? el.text;
+        if (obj.style && typeof obj.style === 'object') {
+          // merge superficiale (se vuoi, profondo)
+          el.style = Object.assign({}, el.style, obj.style);
+        }
+        el.wrap = obj.wrap ?? el.wrap;
+        el.maxLines = obj.maxLines ?? el.maxLines;
+        break;
+      case 'image':
+        el.src = obj.src || el.src; el.alt = obj.alt || el.alt; el.fit = obj.fit || el.fit;
+        break;
+      case 'textbox':
+        el.name = obj.name ?? el.name;
+        el.placeholder = obj.placeholder ?? el.placeholder;
+        el.align = obj.align ?? el.align;
+        el.isPassword = !!(obj.isPassword ?? el.isPassword);
+        el.multiline = !!(obj.multiline ?? el.multiline);
+        el.maxLength = (obj.maxLength == null ? el.maxLength : obj.maxLength);
+        el.pattern = obj.pattern ?? el.pattern;
+
+        if (obj.label && typeof obj.label === 'object') {
+          el.label = Object.assign({}, el.label, obj.label);
+          // merge shallow di style
+          if (obj.label.style && typeof obj.label.style === 'object') {
+            el.label.style = Object.assign({}, el.label.style, obj.label.style);
+          }
+        }
+        if (obj.inputStyle && typeof obj.inputStyle === 'object') {
+          el.inputStyle = Object.assign({}, el.inputStyle, obj.inputStyle);
+          if (obj.inputStyle.border && typeof obj.inputStyle.border === 'object') {
+            el.inputStyle.border = Object.assign({}, el.inputStyle.border, obj.inputStyle.border);
+          }
+        }
+        break;
+
+      case 'checkbox':
+        el.label = obj.label || el.label; el.name = obj.name || el.name; el.checked = !!obj.checked;
+        break;
+      case 'radiogroup':
+        el.name = obj.name || el.name; el.options = [...(obj.options || el.options || [])]; el.inline = !!obj.inline;
+        break;
     }
     return el;
   }
+
   serializeSelection() {
     return this.selected.map(el => this.serializeElement(el));
   }
@@ -322,6 +432,86 @@ export default class Editor {
       outer.scrollLeft = Math.max(0, targetScrollLeft);
       outer.scrollTop = Math.max(0, targetScrollTop);
     }, { passive: false });
+    // --- Dropdown Tema (ThemeFactory) ---
+    const orientGroup = document.querySelector('[role="group"][aria-label="Orientamento"]');
+
+    const themeWrap = document.createElement('div');
+    themeWrap.className = 'ms-2 d-flex align-items-center gap-1';
+
+    const themeLabel = document.createElement('span');
+    themeLabel.className = 'small text-secondary';
+    themeLabel.textContent = 'Tema';
+
+    const sel = document.createElement('select');
+    sel.id = 'themeSelect';
+    sel.className = 'form-select form-select-sm';
+
+    // Popola con i temi disponibili
+    ThemeFactory.list().forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;         // "dark" | "light"
+      opt.textContent = t.label; // "Scuro" | "Chiaro"
+      sel.appendChild(opt);
+    });
+
+    // Seleziona quello corrente
+    sel.value = ThemeFactory.currentTheme.id;
+
+    // Cambia tema on-change
+    sel.addEventListener('change', (e) => {
+      ThemeFactory.apply(e.target.value);
+    });
+
+    themeWrap.appendChild(themeLabel);
+    themeWrap.appendChild(sel);
+    orientGroup.parentNode.insertBefore(themeWrap, orientGroup.nextSibling);
+
+    // --- Resize pannelli laterali ---
+    const installResizer = (panel) => {
+      if (panel.querySelector('.resize-handle')) return;
+      const side = panel.dataset.side; // 'left' | 'right'
+      if (!side) return;
+
+      const h = document.createElement('div');
+      h.className = 'resize-handle';
+      panel.appendChild(h);
+
+      const min = 160, max = 600;
+
+      const onDown = (e) => {
+        if (panel.getAttribute('data-collapsed') === '1') return;
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = panel.getBoundingClientRect().width;
+
+        const onMove = (ev) => {
+          const dx = ev.clientX - startX;
+          let newW = startW;
+          if (side === 'left') newW = startW + dx;
+          if (side === 'right') newW = startW - dx;
+          newW = Math.max(min, Math.min(max, newW));
+          // imposta larghezza come CSS var usata dal pannello
+          panel.style.setProperty('--panel-expanded-w', `${newW}px`);
+          panel.style.width = `${newW}px`;
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          document.body.style.userSelect = '';
+        };
+
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      };
+
+      h.addEventListener('mousedown', onDown);
+    };
+
+    // installa su tutti i dock-panel a sinistra e a destra
+    document.querySelectorAll('.dock-panel[data-side]').forEach(installResizer);
+
+    // se il tuo PanelManager collassa/espande, potresti richiamare installResizer dopo il render
 
   }
   initKeyboard() {
@@ -430,38 +620,530 @@ export default class Editor {
     this.commandMgr.executeCommand(cmd);
   }
   renderPropPanel() {
-    const f = this.propForm; f.innerHTML = '';
+    const f = this.propForm;
+    f.innerHTML = '';
+
+    // --- STEP PROPERTIES (quando non c'è selezione elementi) ---
     if (!this.selected.length) {
-      const step = this.stepMgr?.activeStep; if (!step) { f.innerHTML = '<div class="text-secondary small">Nessuno step attivo</div>'; return; }
+      const step = this.stepMgr?.activeStep;
+      if (!step) {
+        f.innerHTML = '<div class="text-secondary small">Nessuno step attivo</div>';
+        return;
+      }
+
       const wrap = document.createElement('div');
-      wrap.innerHTML = `<div class="mb-2"><label class="form-label small">Titolo step</label><input id="stepName" class="form-control form-control-sm" type="text" value="${step.name}"></div>
-      <div class="mb-2"><label class="form-label small">Orientamento</label><select id="stepOrient" class="form-select form-select-sm"><option value="landscape">16:9</option><option value="portrait">9:16</option></select></div>
-      <div class="mb-2"><label class="form-label small">Sfondo (URL)</label><input id="stepBg" class="form-control form-control-sm" type="url" value="${step.bgUrl || ''}" placeholder="https://…/img.jpg"></div>`;
+      // Campi inline usando .prop-row (CSS visto sopra)
+      wrap.innerHTML = `
+      <div class="prop-row">
+        <label class="form-label small mb-0" for="stepName">Titolo step</label>
+        <input id="stepName" class="form-control form-control-sm prop-input" type="text" value="${step.name}">
+      </div>
+
+      <div class="prop-row">
+        <label class="form-label small mb-0" for="stepOrient">Orientamento</label>
+        <select id="stepOrient" class="form-select form-select-sm prop-input">
+          <option value="landscape">16:9</option>
+          <option value="portrait">9:16</option>
+        </select>
+      </div>
+
+      <div class="prop-row">
+        <label class="form-label small mb-0" for="stepBg">Sfondo (URL)</label>
+        <input id="stepBg" class="form-control form-control-sm prop-input" type="url"
+               value="${step.bgUrl || ''}" placeholder="https://…/img.jpg">
+      </div>
+    `;
       f.appendChild(wrap);
+
+      // sync + listeners
       $('#stepOrient', wrap).value = step.orient;
-      $('#stepName', wrap).addEventListener('input', e => { step.name = e.target.value || step.name; this.stepMgr.render(); });
-      $('#stepOrient', wrap).addEventListener('change', e => { step.orient = e.target.value; this.changeOrientation(step.orient); this.stepMgr.render(); });
-      $('#stepBg', wrap).addEventListener('change', e => { step.bgUrl = e.target.value.trim(); this.setBackground(step.bgUrl); this.stepMgr.scheduleThumb(step); });
+
+      $('#stepName', wrap).addEventListener('input', e => {
+        step.name = e.target.value || step.name;
+        this.stepMgr.render();
+      });
+
+      $('#stepOrient', wrap).addEventListener('change', e => {
+        step.orient = e.target.value;
+        this.changeOrientation(step.orient);
+        this.stepMgr.render();
+      });
+
+      $('#stepBg', wrap).addEventListener('change', e => {
+        step.bgUrl = e.target.value.trim();
+        this.setBackground(step.bgUrl);
+        this.stepMgr.scheduleThumb(step);
+      });
       return;
     }
-    if (this.selected.length > 1) { f.innerHTML = '<div class="text-secondary small">Selezionati: ' + this.selected.length + ' elementi</div>'; return; }
-    const el = this.selected[0]; const schema = el.getPropSchema();
-    const header = document.createElement('div'); header.className = 'd-flex justify-content-between align-items-center mb-1'; header.innerHTML = `<div><span class="badge text-bg-primary">${el.type}</span> <span class="code text-secondary">#${el.id}</span></div>
-    <div class="btn-group btn-group-sm"><button type="button" class="btn btn-outline-danger" id="btnDelete">Elimina</button></div>`; f.appendChild(header); $('#btnDelete', header).addEventListener('click', (e) => { e.preventDefault(); this.selectOnly(el); this.deleteSelectedWithCommand(); });
-    schema.forEach(def => {
-      const row = document.createElement('div'); row.className = 'mb-2'; const id = Editor.uid('prop'); const label = document.createElement('label'); label.className = 'form-label small'; label.htmlFor = id; label.textContent = def.label; let input;
-      if (def.type === 'textarea') { input = document.createElement('textarea'); input.className = 'form-control form-control-sm'; input.rows = 2; }
-      else if (def.type === 'select') { input = document.createElement('select'); input.className = 'form-select form-select-sm'; def.options.forEach(([v, lab]) => { const o = document.createElement('option'); o.value = v; o.textContent = lab; input.appendChild(o); }); }
-      else if (def.type === 'checkbox') { input = document.createElement('input'); input.type = 'checkbox'; input.className = 'form-check-input ms-1'; label.appendChild(input); row.appendChild(label); input.id = id; input.dataset.prop = def.key; input.checked = !!el[def.key]; input.addEventListener('input', () => { el[def.key] = input.checked; el.readProps?.(); this.stepMgr.scheduleThumb(this.stepMgr.activeStep); }); f.appendChild(row); return; }
-      else { input = document.createElement('input'); input.type = def.type || 'text'; input.className = 'form-control form-control-sm'; if (def.min != null) input.min = def.min; }
-      input.id = id; input.dataset.prop = def.key; let v = el[def.key]; if (def.key === 'options') v = el.options.join(';'); if (def.type !== 'checkbox') input.value = v ?? '';
-      input.addEventListener('input', () => {
-        const oldVal = el[def.key];
-        let val = input.value; if (['x', 'y', 'w', 'h', 'fontSize', 'z'].includes(def.key)) val = Number(val || 0); if (def.key === 'options') val = val.split(';').map(s => s.trim()).filter(Boolean); if (def.key === 'z') val = Math.max(0, val);
-        const cmd = new ChangePropertyCommand(this, el, def.key, val, oldVal, `Modifica ${def.label.toLowerCase()}`);
-        this.commandMgr.executeCommand(cmd);
+    if (this.selected.length > 1) {
+      f.innerHTML = '<div class="text-secondary small">Selezionati: ' + this.selected.length + ' elementi</div>';
+      return;
+    }
+
+    const el = this.selected[0];
+    const schema = el.getPropSchema();
+
+    // raggruppa per section
+    const sections = new Map();
+    for (const def of schema) {
+      const sec = def.section || 'Generale';
+      if (!sections.has(sec)) sections.set(sec, []);
+      sections.get(sec).push(def);
+    }
+
+    // builder sezione collassabile
+    const buildSection = (title, defs) => {
+      const sec = document.createElement('div');
+      sec.className = 'prop-section';
+      sec.dataset.collapsed = '0';
+
+      const head = document.createElement('div');
+      head.className = 'prop-head';
+      head.innerHTML = `<div class="title">${title}</div><button type="button" class="btn btn-outline-light btn-sm _toggle">▼</button>`;
+      const body = document.createElement('div');
+      body.className = 'prop-body';
+
+      head.querySelector('._toggle').addEventListener('click', () => {
+        const c = sec.getAttribute('data-collapsed') === '1' ? '0' : '1';
+        sec.setAttribute('data-collapsed', c);
+        head.querySelector('._toggle').textContent = (c === '1' ? '▶' : '▼');
       });
-      row.appendChild(label); row.appendChild(input); f.appendChild(row);
+
+      // raggruppa per group per righe inline
+      const groups = new Map();
+      const singles = [];
+      defs.forEach(d => {
+        if (d.group) {
+          if (!groups.has(d.group)) groups.set(d.group, []);
+          groups.get(d.group).push(d);
+        } else {
+          singles.push(d);
+        }
+      });
+
+      // render helper: un input
+      const renderInput = (def) => {
+        const id = Editor.uid('prop');
+        const row = document.createElement('div');
+        row.className = 'prop-row';
+
+        const label = document.createElement('label');
+        label.className = 'form-label small mb-0';
+        label.htmlFor = id;
+        label.textContent = def.label || '';
+
+        // valore iniziale (supporto path annidato)
+        const pathGet = def.key && def.key.includes('.') ? getByPath : (o, k) => o[k];
+        const pathSet = def.key && def.key.includes('.') ? (o, k, v) => setByPath(o, k, v) : (o, k, v) => { o[k] = v; };
+        let v = def.key ? pathGet(el, def.key) : null;
+
+        // contenitore input
+        const wrap = document.createElement('div');
+        wrap.className = 'prop-inline';
+
+        const makeNumber = () => {
+          const inp = document.createElement('input');
+          inp.type = 'number';
+          inp.className = 'form-control form-control-sm';
+          inp.id = id;
+          if (def.min != null) inp.min = def.min;
+          if (def.max != null) inp.max = def.max;
+          if (def.step != null) inp.step = def.step;
+          if (v != null) inp.value = v;
+          inp.addEventListener('input', () => {
+            let val = Number(inp.value || 0);
+            if (def.min != null) val = Math.max(def.min, val);
+            if (def.max != null) val = Math.min(def.max, val);
+            const oldVal = v;
+            v = val;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+          return inp;
+        };
+
+        const makeText = () => {
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.className = 'form-control form-control-sm';
+          inp.id = id;
+          if (v != null) inp.value = v;
+          inp.addEventListener('input', () => {
+            const oldVal = v; v = inp.value;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+          return inp;
+        };
+
+        const makeTextarea = () => {
+          const ta = document.createElement('textarea');
+          ta.className = 'form-control form-control-sm'; ta.rows = 2; ta.id = id;
+          if (v != null) ta.value = v;
+          ta.addEventListener('input', () => {
+            const oldVal = v; v = ta.value;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+          return ta;
+        };
+
+        const makeSelect = () => {
+          const sel = document.createElement('select');
+          sel.className = 'form-select form-select-sm';
+          sel.id = id;
+          (def.options || []).forEach(([val, lab]) => {
+            const o = document.createElement('option');
+            o.value = val; o.textContent = lab; sel.appendChild(o);
+          });
+          if (v != null) sel.value = v;
+          sel.addEventListener('change', () => {
+            const oldVal = v; v = sel.value;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+          return sel;
+        };
+
+        const makeCheckbox = () => {
+          const inp = document.createElement('input');
+          inp.type = 'checkbox';
+          inp.className = 'form-check-input';
+          inp.id = id;
+          inp.checked = !!v;
+          inp.addEventListener('input', () => {
+            const oldVal = v; v = !!inp.checked;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+          return inp;
+        };
+
+        const makeRange = () => {
+          const box = document.createElement('div');
+          box.className = 'range-wrap';
+
+          const range = document.createElement('input');
+          range.type = 'range';
+          range.className = 'form-range';
+          if (def.min != null) range.min = def.min;
+          if (def.max != null) range.max = def.max;
+          range.step = def.step ?? 1;
+          range.value = v ?? def.min ?? 100;
+
+          const out = document.createElement('span');
+          out.className = 'small-label';
+          out.textContent = range.value;
+
+          range.addEventListener('input', () => {
+            let val = Number(range.value);
+            if (def.min != null) val = Math.max(def.min, val);
+            if (def.max != null) val = Math.min(def.max, val);
+            range.value = String(val);
+            out.textContent = String(val);
+          });
+          range.addEventListener('change', () => {
+            const oldVal = v; v = Number(range.value);
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          });
+
+          box.appendChild(range);
+          box.appendChild(out);
+          return box;
+        };
+
+
+        const makeColorAlpha = () => {
+          const box = document.createElement('div');
+          box.className = 'color-alpha';
+
+          // valore iniziale
+          const { hex, a } = parseColorToHexAlpha(v);
+
+          // color well
+          const color = document.createElement('input');
+          color.type = 'color';
+          color.className = 'form-control form-control-color';
+          color.value = hex;
+
+          // input testo (hex/rgba)
+          const text = document.createElement('input');
+          text.type = 'text';
+          text.className = 'form-control form-control-sm';
+          text.value = (a >= 0.999 ? hex : `rgba(${hexToRgb(hex + 'ff').r}, ${hexToRgb(hex + 'ff').g}, ${hexToRgb(hex + 'ff').b}, ${a})`);
+
+          // alpha number
+          const alpha = document.createElement('input');
+          alpha.type = 'number';
+          alpha.className = 'form-control form-control-sm';
+          alpha.min = '0'; alpha.max = '1'; alpha.step = '0.01';
+          alpha.value = String(a);
+
+          const commit = (newHex, newA) => {
+            const newVal = composeColor(newHex, newA);
+            const oldVal = v; v = newVal;
+            // aggiorna text coerentemente
+            text.value = (newA >= 0.999) ? newHex : `rgba(${hexToRgb(newHex + 'ff').r}, ${hexToRgb(newHex + 'ff').g}, ${hexToRgb(newHex + 'ff').b}, ${newA})`;
+            const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+            this.commandMgr.executeCommand(cmd);
+          };
+
+          color.addEventListener('input', () => {
+            commit(color.value, Number(alpha.value));
+          });
+
+          alpha.addEventListener('input', () => {
+            let av = Number(alpha.value || 0); if (av < 0) av = 0; if (av > 1) av = 1;
+            alpha.value = String(av);
+            commit(color.value, av);
+          });
+
+          text.addEventListener('change', () => {
+            // accetta #rrggbb o rgba(r,g,b,a)
+            const t = text.value.trim();
+            const parsed = parseColorToHexAlpha(t);
+            // se parsing fallisce, non committare
+            if (!parsed) return;
+            color.value = parsed.hex;
+            alpha.value = String(parsed.a);
+            commit(parsed.hex, parsed.a);
+          });
+
+          // α label compatta
+          const aWrap = document.createElement('div');
+          aWrap.className = 'prop-two';
+          const aLab = document.createElement('span'); aLab.className = 'small-label'; aLab.textContent = 'α';
+          aWrap.appendChild(aLab); aWrap.appendChild(alpha);
+
+          box.appendChild(color);
+          box.appendChild(text);
+          box.appendChild(aWrap);
+          return box;
+        };
+
+
+        const makeBoldToggle = () => {
+          const inp = document.createElement('input');
+          inp.type = 'checkbox';
+          inp.className = 'form-check-input';
+          inp.id = id;
+          const current = getByPath(el, 'style.fontWeight') ?? 400;
+          inp.checked = current >= 700;
+          inp.addEventListener('input', () => {
+            const oldVal = getByPath(el, 'style.fontWeight') ?? 400;
+            const newVal = inp.checked ? 700 : 400;
+            const cmd = new ChangePropertyCommand(this, el, 'style.fontWeight', newVal, oldVal, 'Modifica grassetto');
+            this.commandMgr.executeCommand(cmd);
+          });
+          return inp;
+        };
+
+
+        // crea l’input in base al tipo
+        let inputEl;
+        switch (def.type) {
+          case 'number': inputEl = makeNumber(); break;
+          case 'text': inputEl = makeText(); break;
+          case 'textarea': inputEl = makeTextarea(); break;
+          case 'select': inputEl = makeSelect(); break;
+          case 'checkbox': inputEl = makeCheckbox(); break;
+          case 'range': inputEl = makeRange(); break;
+          case 'color-alpha': inputEl = makeColorAlpha(); break;
+          case 'bold-toggle': inputEl = makeBoldToggle(); break;
+          case 'color': // fallback: usa lo stesso controllo con alpha
+          case 'color-alpha': inputEl = makeColorAlpha(); break;
+          case 'regex': {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'form-control form-control-sm';
+            inp.id = id;
+            if (v != null) inp.value = v;
+            const baseBorder = () => {
+              inp.style.borderColor = '';
+              inp.style.boxShadow = '';
+            };
+            const markBad = () => {
+              inp.style.borderColor = '#dc3545';
+              inp.style.boxShadow = '0 0 0 .12rem rgba(220,53,69,.25)';
+            };
+            const tryCompile = (raw) => {
+              if (!raw) return true;
+              let body = raw.trim(), flags = '';
+              if (body[0] === '/' && body.lastIndexOf('/') > 0) {
+                const last = body.lastIndexOf('/');
+                flags = body.slice(last + 1);
+                body = body.slice(1, last);
+              }
+              try { new RegExp(body, flags.replace(/[^gimsuy]/g, '')); return true; }
+              catch { return false; }
+            };
+            const onChange = () => {
+              const raw = inp.value;
+              const ok = tryCompile(raw);
+              if (ok) baseBorder(); else markBad();
+              const oldVal = v; v = raw;
+              const cmd = new ChangePropertyCommand(this, el, def.key, v, oldVal, `Modifica ${def.label.toLowerCase()}`);
+              this.commandMgr.executeCommand(cmd);
+            };
+            inp.addEventListener('input', onChange);
+            // prima validazione
+            if (!tryCompile(inp.value)) markBad();
+
+            inputEl = inp;
+            break;
+          }
+          default: inputEl = makeText(); break;
+        }
+
+        // assembla riga
+        row.appendChild(label);
+        wrap.appendChild(inputEl);
+        row.appendChild(wrap);
+        return row;
+      };
+      const iconSet = new Set(['↔', '↕', '↑', '↓', '→', '←', 'px']);
+      // render gruppi inline
+      const renderGroup = (labelText, defs) => {
+        const row = document.createElement('div');
+        row.className = 'prop-row';
+
+        const label = document.createElement('label');
+        label.className = 'form-label small mb-0';
+        label.textContent = labelText || '';
+
+        const group = document.createElement('div');
+        group.className = 'prop-group';
+
+        defs.forEach(d => {
+          // mini blocco con eventuale mini-label (es. frecce o ↔/↕)
+          const mini = document.createElement('div');
+          mini.className = 'mini';
+
+          if (d.label) {
+            const sl = document.createElement('span');
+            sl.className = 'small-label';
+            sl.textContent = d.label;
+            if (iconSet.has(d.label)) sl.classList.add('icon');
+            mini.appendChild(sl);
+          }
+          // sfrutta renderInput ma senza label grande
+          const tmp = Object.assign({}, d, { label: '' });
+          const cell = renderInput(tmp);
+          // prendi SOLO l’input (secondo figlio .prop-inline)
+          mini.appendChild(cell.querySelector('.prop-inline').firstChild);
+          group.appendChild(mini);
+        });
+
+        row.appendChild(label);
+        row.appendChild(group);
+        return row;
+      };
+      // Render "a blocco": un'unica label a sinistra, a destra una colonna di righe
+      const renderBlock = (title, rowsOfDefs) => {
+        const row = document.createElement('div');
+        row.className = 'prop-row';
+
+        const label = document.createElement('label');
+        label.className = 'form-label small mb-0';
+        label.textContent = title || '';
+
+        const vwrap = document.createElement('div');
+        vwrap.className = 'vstack gap-2 flex-grow-1';
+
+        rowsOfDefs.forEach(defs => {
+          const line = document.createElement('div');   // ogni riga del blocco
+          line.className = 'prop-group';                // usa il layout orizzontale per quella riga
+
+          defs.forEach(d => {
+            const mini = document.createElement('div');
+            mini.className = 'mini';
+
+            if (d.label) {
+              const sl = document.createElement('span');
+              sl.className = 'small-label';
+              sl.textContent = d.label;
+              if (iconSet.has(d.label)) sl.classList.add('icon');
+              mini.appendChild(sl);
+            }
+
+            const tmp = Object.assign({}, d, { label: '' }); // nessuna seconda label
+            const cell = renderInput(tmp);
+            mini.appendChild(cell.querySelector('.prop-inline').firstChild);
+            line.appendChild(mini);
+          });
+
+          vwrap.appendChild(line);
+        });
+
+        row.appendChild(label);
+        row.appendChild(vwrap);
+        return row;
+      };
+
+      // prima i gruppi
+      // font-size → "Dimensione" su UNA riga (numero + unità)
+      if (groups.has('font-size')) {
+        body.appendChild(renderGroup('Dimensione', groups.get('font-size')));
+        groups.delete('font-size');
+      }
+
+      // font-weight → "Peso" su UNA riga (slider + valore)
+      if (groups.has('font-weight')) {
+        body.appendChild(renderGroup('Peso', groups.get('font-weight')));
+        groups.delete('font-weight');
+      }
+
+      // Ombra → blocco: 4 righe (X, Y, Colore, Sfocatura)
+      // Ombra → 4 righe: ↔ / ↕ / (picker) / Blurr
+      if (groups.has('shadow')) {
+        const defs = groups.get('shadow');
+        const X = defs.find(d => d.key.endsWith('.x'));
+        const Y = defs.find(d => d.key.endsWith('.y'));
+        const C = defs.find(d => d.key.endsWith('.color'));
+        const B = defs.find(d => d.key.endsWith('.blur'));
+        const rows = [[X], [Y], [C], [B]].map(r => r.filter(Boolean));
+        body.appendChild(renderBlock('Ombra', rows));
+        groups.delete('shadow');
+      }
+
+      // Bordo → 2 righe: px / (picker)
+      if (groups.has('border')) {
+        const defs = groups.get('border');
+        const W = defs.find(d => d.key.includes('.width'));
+        const C = defs.find(d => d.key.includes('.color'));
+        const rows = [[W], [C]].map(r => r.filter(Boolean));
+        body.appendChild(renderBlock('Bordo', rows));
+        groups.delete('border');
+      }
+
+      // Padding → 2 righe: ↑ ↓  /  → ←
+      if (groups.has('padding')) {
+        const defs = groups.get('padding');
+        const T = defs.find(d => d.key.endsWith('.top'));
+        const B = defs.find(d => d.key.endsWith('.bottom'));
+        const R = defs.find(d => d.key.endsWith('.right'));
+        const L = defs.find(d => d.key.endsWith('.left'));
+        const rows = [[T, B], [R, L]].map(r => r.filter(Boolean));
+        body.appendChild(renderBlock('Padding', rows));
+        groups.delete('padding');
+      }
+
+
+      // ora i singoli non raggruppati
+      singles.forEach(def => body.appendChild(renderInput(def)));
+      // eventuali gruppi rimasti (se ne aggiungerai in futuro)
+      groups.forEach((defs, name) => body.appendChild(renderGroup(name, defs)));
+
+      sec.appendChild(head);
+      sec.appendChild(body);
+      return sec;
+    };
+
+    // render sezioni nell’ordine
+    sections.forEach((defs, title) => {
+      f.appendChild(buildSection(title, defs));
     });
   }
   execCommand(cmd) {

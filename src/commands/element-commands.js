@@ -1,4 +1,5 @@
 import BaseCommand from './base-command.js';
+import { getByPath, setByPath } from '../core/utils.js';
 
 /**
  * Command for adding an element to the canvas
@@ -186,27 +187,43 @@ export class ChangePropertyCommand extends BaseCommand {
   constructor(editor, element, property, newValue, oldValue, description = 'Modifica proprietà') {
     super(editor, description);
     this.element = element;
-    this.property = property;
+    this.property = property; // può essere "x" oppure "style.fontSize" ecc.
     this.newValue = newValue;
     this.oldValue = oldValue;
   }
 
+  #isTransformKey(k) {
+    return ['x', 'y', 'w', 'h', 'z', 'rotation'].includes(k);
+  }
+
   execute() {
-    this.element[this.property] = this.newValue;
-    if (['x', 'y', 'w', 'h', 'z'].includes(this.property)) {
-      this.element.applyTransform();
-    } else {
+    const isNested = this.property.includes('.');
+    if (isNested) {
+      setByPath(this.element, this.property, this.newValue);
       this.element.readProps?.();
+    } else {
+      this.element[this.property] = this.newValue;
+      if (this.#isTransformKey(this.property)) {
+        this.element.applyTransform();
+      } else {
+        this.element.readProps?.();
+      }
     }
     this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
   }
 
   undo() {
-    this.element[this.property] = this.oldValue;
-    if (['x', 'y', 'w', 'h', 'z'].includes(this.property)) {
-      this.element.applyTransform();
-    } else {
+    const isNested = this.property.includes('.');
+    if (isNested) {
+      setByPath(this.element, this.property, this.oldValue);
       this.element.readProps?.();
+    } else {
+      this.element[this.property] = this.oldValue;
+      if (this.#isTransformKey(this.property)) {
+        this.element.applyTransform();
+      } else {
+        this.element.readProps?.();
+      }
     }
     this.editor.reflectSelection();
     this.editor.stepMgr.scheduleThumb(this.editor.stepMgr.activeStep);
@@ -214,12 +231,10 @@ export class ChangePropertyCommand extends BaseCommand {
 
   canMergeWith(otherCommand) {
     if (!(otherCommand instanceof ChangePropertyCommand)) return false;
-    return this.element === otherCommand.element &&
-      this.property === otherCommand.property;
+    return this.element === otherCommand.element && this.property === otherCommand.property;
   }
 
   mergeWith(otherCommand) {
-    // Keep the original old value, update to new value
     this.newValue = otherCommand.newValue;
     this.timestamp = otherCommand.timestamp;
     return this;
