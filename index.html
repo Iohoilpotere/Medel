@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Medel Editor — nuova architettura</title>
+  <link rel="icon" href="./favicon.ico">
+  <link rel="stylesheet" href="./css/base.css">
+  <link rel="stylesheet" href="./css/panels.css">
+  <link rel="stylesheet" href="./css/stage.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="left">
+        <select id="aspectSelect" title="Orientamento">
+          <option value="16:9">16:9</option>
+          <option value="9:16">9:16</option>
+          <option value="4:3">4:3</option>
+        </select>
+        <div class="divider"></div>
+        <label> Tema </label>
+        <select id="themeSelect">
+          <option value="dark">Scuro</option>
+          <option value="light">Chiaro</option>
+        </select>
+        <div class="divider"></div>
+        <label> Snap/Grid </label>
+        <input id="gridSize" type="range" min="0" max="40" step="1" value="16" />
+        <span id="gridSizeLabel">16px</span>
+        <label class="ml">Griglia fine</label>
+        <input id="gridFine" type="checkbox" />
+      </div>
+      <div class="center">
+        <div class="align-toolbar" id="alignToolbar" title="Allinea / distribuisci">
+          <button data-cmd="align-left" title="Allinea a sinistra">⯇</button>
+          <button data-cmd="align-center-x" title="Allinea orizz. centro">↔</button>
+          <button data-cmd="align-right" title="Allinea a destra">⯈</button>
+          <div class="divider"></div>
+          <button data-cmd="align-top" title="Allinea in alto">⯅</button>
+          <button data-cmd="align-center-y" title="Allinea vert. centro">↕</button>
+          <button data-cmd="align-bottom" title="Allinea in basso">⯆</button>
+          <div class="divider"></div>
+          <button data-cmd="distribute-h" title="Distribuisci orizz.">≋</button>
+          <button data-cmd="distribute-v" title="Distribuisci vert.">≡</button>
+        </div>
+      </div>
+      <div class="right">
+        <button id="undoBtn" title="Annulla (Ctrl+Z)">↶</button>
+        <button id="redoBtn" title="Ripeti (Ctrl+Y)">↷</button>
+        <div class="divider"></div>
+        <input id="bgUrl" type="text" placeholder="Sfondo (URL)" class="bg-input"/>
+        <button id="setBgBtn">Imposta</button>
+        <div class="divider"></div>
+        <button id="exportBtn">Esporta HTML</button>
+        <button id="saveJsonBtn">Esporta JSON</button>
+        <button id="importJsonBtn">Importa JSON</button>
+        <input id="importJsonFile" type="file" accept="application/json" style="display:none" />
+      </div>
+    </header>
+    <div class="main">
+      <aside class="leftpanes">
+        <div class="tabstrip">
+          <button data-tab="elements" class="active">Elementi</button>
+          <button data-tab="indicators">Indicatori</button>
+          <button data-tab="steps">Step</button>
+        </div>
+        <div class="pane bodies">
+          <section id="elementsPane" class="pane-body active">
+            <ul id="elementPalette" class="palette"></ul>
+            <div class="hint">
+              <p><kbd>DEL</kbd> elimina, <kbd>←↑→↓</kbd> sposta (<kbd>Shift</kbd> = snap a griglia). <kbd>Ctrl+Z</kbd> annulla.</p>
+              <p>Ctrl/Shift-click per multi-selezione. Trascina un elemento nello step.</p>
+            </div>
+          </section>
+                    <section id="indicatorsPane" class="pane-body">
+            <div class="indicators-toolbar">
+              <button id="addIndicatorBtn">+ Indicatore</button>
+              <button id="delIndicatorBtn">Elimina</button>
+            </div>
+            <ul id="indicatorsList" class="steps indicators"></ul>
+          </section>
+          <section id="stepsPane" class="pane-body">
+            <div class="steps-toolbar">
+              <button id="addCategoryBtn">+ Categoria</button>
+              <button id="addStepBtn">+ Step</button>
+            </div>
+            <ul id="stepsList" class="steps"></ul>
+          </section>
+        </div>
+      </aside>
+      <section class="stage-wrap">
+        <div id="zoomSlider"><input id="zoomRange" type="range" min="20" max="300" step="10" value="100"><span id="zoomHud" class="zoom-hud">100%</span></div>
+        <div id="stageHost" class="stage-host"></div>
+      </section>
+      <aside class="rightpane">
+        <div class="tabstrip" id="rightTabs">
+          <button data-tab="props" class="active">Proprietà</button>
+          <button data-tab="history">Storia</button>
+        </div>
+        <div class="pane bodies">
+          <section id="propsPane" class="pane-body active">
+            <form id="propForm" class="prop-form"></form>
+          </section>
+          <section id="historyPane" class="pane-body">
+            <ul id="historyList" class="steps"></ul>
+          </section>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

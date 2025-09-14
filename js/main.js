@@ -1,0 +1,1 @@
+import { App } from './app.js'; const app = new App(); app.init(); window.__app = app;

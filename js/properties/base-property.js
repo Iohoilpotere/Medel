@@ -1,0 +1,1 @@
+export class BaseProperty{ constructor(key,label,category='Generale'){ this.key=key; this.label=label; this.category=category;} render(value,onChange){ const el=document.createElement('div'); el.textContent='TODO'; return el;} static appliesTo(){ return true; }}

@@ -1,0 +1,1 @@
+const set=new Set(); export function ensureCss(href){if(set.has(href))return;const l=document.createElement('link');l.rel='stylesheet';l.href=href;document.head.appendChild(l);set.add(href);}

@@ -1,0 +1,1 @@
+import { BaseCommand } from '../command-manager.js'; export class UpdateStageBgCommand extends BaseCommand{ constructor(stage,url){ super(); this.stage=stage; this.newUrl=url; this.oldUrl=stage.bgUrl;} do(){ this.stage.setBackground(this.newUrl);} undo(){ this.stage.setBackground(this.oldUrl);} label(){return `Stage background: ${this.newUrl||'(none)'}`;} }

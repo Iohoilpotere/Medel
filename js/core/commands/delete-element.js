@@ -1,0 +1,1 @@
+import { BaseCommand } from '../command-manager.js'; export class DeleteElementCommand extends BaseCommand{ constructor(stage,el){ super(); this.stage=stage; this.el=el; this.idx=stage.elements.indexOf(el);} do(){this.stage.removeElement(this.el)} undo(){this.stage.addElement(this.el,this.idx)} }

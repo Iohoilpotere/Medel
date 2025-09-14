@@ -1,0 +1,1 @@
+export class EventBus{constructor(){this.map=new Map()} on(t,cb){(this.map.get(t)??this.map.set(t,new Set()).get(t)).add(cb);return()=>this.off(t,cb)} off(t,cb){this.map.get(t)?.delete(cb)} emit(t,p){for(const cb of this.map.get(t)??[]) cb(p)}}

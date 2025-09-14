@@ -1,0 +1,300 @@
+
+:root{
+  --topbar-h: 36px;
+  --bg: #101317;
+  --fg: #e6e6e6;
+  --muted: #a7a7a7;
+  --panel: var(--panel);
+  --accent: #5bbcf6;
+  --accent-2:#ff6a6a;
+  --grid:#2a2f38;
+  --border:#2b323c;
+  --shadow: rgba(0,0,0,.4);
+}
+:root[data-theme="dark"]{--bg:#0b0e11;--fg:#e8edf2;--panel:#131923;--panel-2:#1b2230;--border:#222836;--muted:#a8b3c2;--accent:#5bbcf6;--grid:#28303b;--stage-bg:#0d1117;--control-bg:#0f1319}
+:root[data-theme="light"]{--bg:#ffffff;--fg:#111111;--panel:#ffffff;--panel-2:#f3f6fa;--border:#cfd6e0;--muted:#475569;--accent:#2f7dd3;--grid:#e6eef6;--stage-bg:#ffffff;--control-bg:#ffffff}
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+html,body{overflow:hidden}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+button,select,input{font-family:inherit;color:var(--fg);background:var(--control-bg);border:1px solid var(--border);}
+button:hover,select:hover,input:hover{border-color:var(--accent)}
+.app{display:flex;flex-direction:column;height:100%}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--border);gap:6px;position:sticky;top:0;z-index:2;white-space:nowrap;height:var(--topbar-h)}
+.topbar .left,.topbar .right,.topbar .center{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.topbar .divider{width:1px;height:20px;background:var(--border)}
+.topbar label{color:var(--muted);font-size:.9rem}
+.topbar button{padding:6px 10px;border-radius:8px;cursor:pointer}
+.bg-input{width:260px}
+.ml{margin-left:6px}
+.main{display:grid;grid-template-columns:280px 1fr 360px;gap:0;height:calc(100vh - var(--topbar-h));overflow:hidden}
+.leftpanes{display:flex;flex-direction:column;border-right:1px solid var(--border);background:var(--panel);min-width:280px;max-width:280px;overflow:hidden}
+.tabstrip{display:flex}
+.tabstrip button{flex:1;background:none;border:none;padding:12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.tabstrip button.active{color:var(--fg);border-color:var(--accent)}
+.pane.bodies{flex:1;overflow:auto;max-height:100%}
+.pane-body{display:none;padding:12px}
+.pane-body.active{display:block}
+.palette{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.palette li{padding:10px;border:1px dashed var(--border);border-radius:10px;background:var(--panel-2);cursor:grab;display:flex;justify-content:space-between;align-items:center}
+.palette li small{color:var(--muted)}
+.hint{margin-top:10px;color:var(--muted);font-size:.9rem}
+.rightpane{border-left:1px solid var(--border);background:var(--panel);padding:12px;overflow:hidden;min-width:360px;max-width:360px}
+.prop-form{display:flex;flex-direction:column;gap:10px}
+.prop-group{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--panel-2)}
+.prop-group h4{margin:.2rem 0 .5rem 0;color:var(--muted);font-weight:600}
+.prop-row{display:flex;align-items:center;gap:8px;margin:6px 0}
+.prop-row label{flex:0 0 140px;color:var(--muted);font-size:.9rem}
+.prop-row input,.prop-row textarea,.prop-row select{flex:1;background:#0f1319;border:1px solid var(--border);color:var(--fg);padding:6px 8px;border-radius:8px}
+.prop-row input[type="checkbox"]{flex:0}
+.prop-row textarea{min-height:64px;resize:vertical}
+.steps-toolbar{display:flex;gap:6px;margin-bottom:8px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps li{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px;display:flex;justify-content:space-between;align-items:center;cursor:grab}
+.steps li .title{display:flex;gap:6px;align-items:center}
+.steps li .badge{background:#2b313c;color:#9fb1cc;border-radius:8px;padding:2px 6px;font-size:.75rem}
+.align-toolbar{display:flex;flex-wrap:nowrap}
+.align-toolbar button{width:34px;height:28px;flex:0 0 auto}
+
+.stage-host.panning, .stage-host.panning *{cursor:grabbing !important}
+
+.tree{list-style:none;margin:0;padding-left:0}
+.tree .tree{padding-left:16px}
+.tree-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;margin:4px 6px;padding:6px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.tree-item .title{display:flex;align-items:center;gap:8px}
+.tree-item .name{cursor:text}
+.dropline{pointer-events:none}
+
+.tree-item.drag-over{outline:2px solid var(--accent)}
+
+:root[data-theme="light"] .prop-row input,
+:root[data-theme="light"] .prop-row textarea,
+:root[data-theme="light"] .prop-row select{
+  background:#ffffff;
+  color:#111111;
+  border:1px solid var(--border);
+}
+
+
+/* Steps panel layout */
+#stepsPane, #stepsPane *{ box-sizing:border-box; }
+#stepsPane .pane-body{ width:100%; overflow-x:hidden; }
+#stepsList{ width:100%; }
+.tree{list-style:none;margin:0;padding-left:0;width:100%;}
+.tree .tree{padding-left:16px;}
+.tree-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;margin:6px 4px;padding:6px;width:100%;}
+.tree-item .row{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;}
+.tree-item .left{display:flex;align-items:center;gap:8px;min-width:0;}
+.tree-item .right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.tree-item .name{cursor:text; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px;}
+.tree-item .thumb{margin:6px 0 0 24px; display:block; max-width:100%;}
+.tree-item .caret{background:transparent;border:none;cursor:pointer;}
+.tree-item .caret.dot{cursor:default; opacity:0.6;}
+.tree-item.drag-over{outline:2px solid var(--accent);}
+.rename{max-width:220px;}
+
+
+/* Steps panel - card layout */
+#stepsPane .pane-body{ width:100%; overflow-x:hidden; }
+#stepsList{ width:100%; }
+.tree{list-style:none;margin:0;padding-left:0;width:100%;}
+.tree .tree{padding-left:16px;}
+.tree-item{width:100%; padding-left:0; box-sizing:border-box;}
+.tree-item.depth-0{padding-left:0}
+.tree-item.depth-1{padding-left:12px}
+.tree-item.depth-2{padding-left:24px}
+.tree-item.depth-3{padding-left:36px}
+.tree-item .card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;margin:6px 4px;padding:8px;width:100%;box-sizing:border-box;overflow:hidden}
+.tree-item .card .header{display:flex;align-items:center;gap:8px;margin-bottom:6px;min-width:0}
+.tree-item .card .header .name{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600}
+.tree-item .card .header .caret{background:transparent;border:none;cursor:pointer;flex:0 0 auto}
+.tree-item .card .body{display:flex;align-items:flex-start;gap:10px;width:100%}
+.tree-item .card .thumb{width:70%; max-width:70%; height:auto; display:block; border:1px solid var(--border); border-radius:6px; background:var(--panel)}
+.tree-item .card .actions{display:flex;flex-direction:column;gap:6px;align-items:stretch; flex:1}
+.tree-item .card .actions button{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:6px 8px}
+.tree-item.drag-over .card{outline:2px solid var(--accent);}
+/* Prevent horizontal overflow anywhere in left panes */
+.leftpanes .pane-body{overflow-x:hidden}
+
+
+/* Steps - new card layout */
+#stepsPane .pane-body{ width:100%; overflow-x:hidden; }
+#stepsList{ width:100%; }
+.tree{list-style:none;margin:0;padding:0;width:100%;}
+.tree > li{ margin:8px 0; }
+.sp-card{background:var(--panel-2); border:1px solid var(--border); border-radius:12px; padding:8px; width:100%; box-sizing:border-box; overflow:hidden}
+.sp-header{display:flex; align-items:center; gap:8px; min-width:0}
+.sp-title{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600}
+.sp-caret{background:transparent; border:none; cursor:pointer; padding:4px; flex:0 0 auto}
+.sp-body{margin-top:6px}
+.sp-body .children{display:flex; flex-direction:column; gap:8px; width:100%;}
+.sp-thumb{display:block; width:100%; height:auto; border:1px solid var(--border); border-radius:8px; background:var(--panel);}
+.sp-footer{display:flex; gap:8px; justify-content:flex-end; margin-top:8px}
+.icon-btn{width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--border); background:var(--control-bg); border-radius:8px; cursor:pointer}
+.icon-btn svg{width:18px; height:18px; display:block}
+.tree .sp-card.drag-over{outline:2px solid var(--accent)}
+/* Inputs in light theme remain legible */
+:root[data-theme="light"] #stepsPane input.rename{ background:#fff; color:#111; border:1px solid var(--border); }
+/* Prevent any horizontal overflow in left panes */
+.leftpanes .pane-body{ overflow-x:hidden }
+
+/* Drop line indicator */
+.sp-dropline{position:absolute;height:2px;background:var(--accent);pointer-events:none;display:none;z-index:5;border-radius:2px}
+
+/* === UI Tweaks: nested items in Steps panel === */
+#stepsPane .children { padding-left: 6px; } /* reduce left gutter inside categories */
+#stepsPane .children > li { margin-left: 0; } /* avoid extra default indent */
+#stepsPane .sp-card { box-sizing: border-box; width: 100%; }
+#stepsPane .sp-card.nested { margin-left: 2px; } /* small left margin so inner content gets wider */
+
+/* Action buttons sizing */
+#stepsPane .sp-card .sp-footer .icon-btn{
+  width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+}
+#stepsPane .sp-card.nested .sp-footer .icon-btn{
+  width: 24px; height: 24px;
+}
+#stepsPane .sp-card .sp-footer .icon-btn svg{ width: 1em; height: 1em; }
+
+/* Slightly tighter paddings on nested cards */
+#stepsPane .sp-card.nested .sp-header{ padding-left: 6px; padding-right: 6px; }
+#stepsPane .sp-card.nested .sp-body{ padding-left: 6px; padding-right: 6px; }
+#stepsPane .sp-card.nested .sp-footer{ padding-left: 4px; padding-right: 4px; }
+
+
+/* === FIX doppio bordo: nessun bordo su <li>, bordo solo su .sp-card === */
+#stepsPane ul.tree > li,
+#stepsPane .children > li{
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+  padding: 0; /* niente padding extra sul LI */
+}
+#stepsPane ul.tree{ border: 0; }
+#stepsPane .sp-card{
+  border: 1px solid var(--panel-border, rgba(0,0,0,.15));
+  box-shadow: none;
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* Assicuriamoci che header/body/footer interni non ridisegnino bordi */
+#stepsPane .sp-card .sp-header,
+#stepsPane .sp-card .sp-body,
+#stepsPane .sp-card .sp-footer,
+#stepsPane .sp-card .children,
+#stepsPane .sp-card .sp-thumb{
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* === Handle cursors === */
+.handle.handle-n { cursor: ns-resize; }
+.handle.handle-s { cursor: ns-resize; }
+.handle.handle-e { cursor: ew-resize; }
+.handle.handle-w { cursor: ew-resize; }
+.handle.handle-nw { cursor: nwse-resize; }
+.handle.handle-se { cursor: nwse-resize; }
+.handle.handle-ne { cursor: nesw-resize; }
+.handle.handle-sw { cursor: nesw-resize; }
+
+/* Ensure any residual center handle is hidden */
+.handle.handle-c { display: none !important; }
+
+/* Handle cursors (class 'handle n|e|s|w|nw|ne|sw|se') */
+.handle.n { cursor: ns-resize; }
+.handle.s { cursor: ns-resize; }
+.handle.e { cursor: ew-resize; }
+.handle.w { cursor: ew-resize; }
+.handle.nw { cursor: nwse-resize; }
+.handle.se { cursor: nwse-resize; }
+.handle.ne { cursor: nesw-resize; }
+.handle.sw { cursor: nesw-resize; }
+
+/* Image element viewport */
+.element.image .img-viewport{
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.element.image img.img{
+  position: absolute;
+  display: block;
+  max-width: none; /* we'll size explicitly */
+  max-height: none;
+  user-select: none;
+  pointer-events: none; /* image shouldn't capture events; element handles them */
+}
+
+/* Image element viewport & bitmap */
+.element.image .img-viewport{ position: relative; width:100%; height:100%; overflow:hidden; }
+.element.image img.img{ position:absolute; display:block; max-width:none; max-height:none; user-select:none; pointer-events:none; }
+
+/* Image element viewport, no overflow ever */
+.element.image .img-viewport{ position:relative; width:100%; height:100%; overflow:hidden; }
+.element.image img.img{ position:absolute; display:block; max-width:none; max-height:none; user-select:none; pointer-events:none; transition:none; }
+
+/* Stretch image to fill the element, never overflow (clipped by viewport) */
+.element.image .img-viewport{ position:relative; width:100%; height:100%; overflow:hidden; }
+.element.image img.img{
+  position:absolute; inset:0; width:100%; height:100%;
+  object-fit: fill; object-position: center center;
+  display:block; user-select:none; pointer-events:none; max-width:none; max-height:none;
+}
+
+/* Image viewport & bitmap (fit + crop) */
+.element.image .img-viewport{ position: relative; width:100%; height:100%; overflow:hidden; }
+.element.image img.img{
+  position: absolute;
+  display: block;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Ensure element content fills the element box so inner viewports can use height:100% */
+.element .content{
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Stable label rendering */
+.element.label .content{ position: relative; }
+.element.label .content .label{
+  position: absolute;
+  left: 0; top: 0;
+  line-height: 1;
+  white-space: pre-wrap;
+  display: block;
+}
+
+/* Reduce subpixel text shift on zoom */
+.element.label .content .label{
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Force all element inner content to stay inside the element rect */
+.element .content{
+  overflow: hidden;
+}
+
+
+/* --- Overflow-safe property rows (no horizontal scroll) --- */
+.rightpane .prop-group{ overflow:hidden; }
+.rightpane .prop-form{ overflow-x:hidden; }
+.rightpane .prop-row{ width:100%; overflow:hidden; justify-content:flex-start; flex-wrap:nowrap; }
+.rightpane .prop-row > *{ min-width:0; }
+.rightpane .prop-row label{ flex:0 0 140px; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rightpane .prop-row input,
+.rightpane .prop-row textarea,
+.rightpane .prop-row select{ flex:1 1 auto; min-width:0; max-width:100%; }
+.rightpane .color-with-alpha{ flex:1 1 auto; min-width:0; max-width:100%; }
+.rightpane .color-with-alpha > *{ min-width:0; }
+.rightpane .color-with-alpha input[type="text"]{ flex:1 1 auto; min-width:0; max-width:100%; }
+.rightpane .color-with-alpha input[type="number"]{ flex:0 0 64px; min-width:0; }
+.rightpane .bg-input{ width:100%; max-width:100%; }
