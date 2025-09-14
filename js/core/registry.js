@@ -10,7 +10,7 @@ class Registry {
 }
 export const registry = new Registry();
 const toAbs = p => p.startsWith('/')? p : '/' + p.replace(/^\.\/?/, '');
-export async function loadModules(){
-  const m = await (await fetch('/js/manifest.json')).json();
+export async function loadModules(){  
+  const m = await (await fetch('./js/manifest.json')).json();
   await Promise.all([ ...m.elements.map(x=> import(toAbs(x))), ...m.properties.map(x=> import(toAbs(x))) ]);
 }
