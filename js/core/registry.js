@@ -9,9 +9,14 @@ class Registry {
   createProperty(type, opts){ const C = this.properties.get(type); if(!C) throw new Error(`Proprietà non trovata: ${type}`); return new C(opts); }
 }
 export const registry = new Registry();
-export async function loadModules(){  
-  // Manifest relativo alla pagina (funziona sia in Live Server che su GitHub Pages)
-  const manifestUrl = new URL('./js/manifest.json', window.location.href);
+const ROOT = new URL('../..', import.meta.url); // da /js/core/ al root del sito (…/<repo>/)
+const toUrl = (p) => {
+  // togli eventuali slash iniziali e risolvi dal ROOT
+  const clean = String(p).replace(/^\/+/, '');
+  return new URL(clean, ROOT).toString();
+};
+export async function loadModules() {
+  const manifestUrl = new URL('js/manifest.json', ROOT);
   const res = await fetch(manifestUrl, { cache: 'no-store' });
   if (!res.ok) {
     const txt = await res.text();
@@ -19,12 +24,10 @@ export async function loadModules(){
   }
   const m = await res.json();
 
-  // Converte "/js/..." o "js/..." in un URL relativo alla pagina corrente
-  const toUrl = (p) => new URL(p.replace(/^\/+/, './'), window.location.href).toString();
-
   await Promise.all([
-    ...m.elements.map(x => import(toUrl(x))),
-    ...m.properties.map(x => import(toUrl(x)))
+    ...m.elements.map(x => import(/* @vite-ignore */ toUrl(x))),
+    ...m.properties.map(x => import(/* @vite-ignore */ toUrl(x))),
   ]);
 }
+
 
