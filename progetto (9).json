@@ -1,0 +1,687 @@
+{
+  "steps": [
+    {
+      "type": "category",
+      "title": "Categoria",
+      "children": [
+        {
+          "type": "step",
+          "title": "Step 1",
+          "aspect": "16:9",
+          "bgUrl": "https://static.vecteezy.com/system/resources/previews/043/779/032/non_2x/dynamic-navy-blue-stucco-texture-with-spotlight-abstract-grunge-accent-piece-on-wide-angle-background-photo.jpg",
+          "elements": [
+            {
+              "type": "textbox",
+              "x": 32,
+              "y": 512,
+              "w": 400,
+              "h": 48,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "placeholder": "Testo...",
+                "value": ""
+              }
+            },
+            {
+              "type": "label",
+              "x": 448,
+              "y": 32,
+              "w": 816,
+              "h": 672,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 18,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.1,
+                "alignH": "justify",
+                "alignV": "middle",
+                "shadowColor": "rgba(0,0,0,1)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(0,0,0,0.7)",
+                "strokeWidth": 0.1,
+                "backgroundColor": "rgba(0,0,0,0)",
+                "borderColor": "rgba(0,0,0,0)",
+                "borderWidth": 0,
+                "borderStyle": "solid",
+                "borderRadius": 0,
+                "text": "<div><b>Etichetta</b></div><div><b><br></b></div><div><b>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer et sollicitudin sem. Nulla consequat nisl eget mauris lacinia ultrices. Proin vel nibh at dui consequat tristique. Nullam vel quam euismod, consequat magna vel, efficitur sem. Fusce</b> semper justo vitae magna dignissim elementum. Praesent sed tincidunt felis. Vestibulum rutrum, leo sit amet dignissim molestie, risus risus dignissim tortor, non vehicula ipsum leo sit amet diam. Pellentesque lacus metus, semper id laoreet quis, tristique quis ex. Mauris volutpat, nulla lobortis semper lacinia, nulla enim fringilla purus, ut tincidunt dolor arcu at eros. Praesent ut tellus vitae mi dictum porta vel ac mauris. Etiam <i>eleifend metus dui, at interdum felis rhoncus quis.</i></div><div><i>Cras viverra purus id metus ornare vehicula. Sed rutrum gravida tincidunt. Nunc in aliquam mauris. Phasellus congue metus nec tellus blandit placerat. Nullam sodales lectus mauris, in</i> convallis lorem consequat vitae. Nunc libero mi, condimentum porta eros id, vehicula malesuada metus. Nam sodales elit ac arcu sollicitudin ultrices. Vestibulum tempus fermentum euismod. Maecenas pellentesque odio non libero tincidunt viverra. Ut pharetra at eros non aliquam. Nullam et ligula ac mi finibus varius. Sed erat enim, aliquam ac velit ac, lacinia malesuada est.</div><div><br></div><div><br></div><div>Morbi massa orci, auctor sagittis pellentesque ac, tristique a nisl. Quisque et porta velit, ac gravida nisi. Pellentesque accumsan felis sit amet ultricies condimentum. Sed volutpat laoreet metus, ac dapibus lectus dictum sit amet. Fusce nibh quam, bibendum sed elementum non, feugiat non est. Maecenas a enim vel nibh imperdiet accumsan. Donec aliquet facilisis est, et fringilla velit sollicitudin sit amet. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Donec facilisis augue augue, quis consequat metus rutrum et.</div><div><br></div><div>Sed a molestie nisi. Ut volutpat sem eget dui pharetra, molestie accumsan diam semper. Aliquam eu aliquet urna, vel consectetur quam. Pellentesque eget magna et purus sodales gravida. Nulla a lorem vel magna semper sagittis. Morbi id arcu consequat, aliquam massa sit amet, sollicitudin neque. Vivamus ex massa, sollicitudin et nisl a, posuere egestas orci. Suspendisse mattis, eros mattis gravida gravida, mi massa accumsan tortor, id volutpat orci sem vel nisl. Mauris nibh tortor, luctus non tellus consequat, lobortis interdum nisi.</div><div><u><br></u></div><div><u>Donec suscipit risus vitae euismod pellentesque. Aliquam a felis id quam ornare imperdiet. Nulla dapibus euismod purus vel facilisis. Aliquam vehicula nulla quis arcu auctor interdum. Cras mattis massa eget purus tempus, quis fermentum ante pretium. Nam sodales nec nibh sit amet porttitor. Integer commodo quam in dui scelerisque volutpat. Nunc sit amet dolor consectetur, interdum nibh sit amet, fringilla mi. Sed rhoncus odio magna, faucibus venenatis purus accumsan ut. Proin ac pharetra massa. Donec ligula libero, vehicula quis eros et, tempor luctus diam. Donec posuere id lectus id semper. Morbi venenatis leo at risus commodo, non pharetra nisl rhoncus. Pellentesque mattis placerat pulvinar. Mauris blandit metus in malesuada elementum.</u></div>",
+                "color": "#ffffff",
+                "shadow": true
+              }
+            },
+            {
+              "type": "image",
+              "x": 32,
+              "y": 96,
+              "w": 400,
+              "h": 416,
+              "props": {
+                "z": 0,
+                "url": "https://cdn.britannica.com/79/191679-050-C7114D2B/Adult-capybara.jpg",
+                "alt": "",
+                "fit": "fill",
+                "srcRect": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 100,
+                  "h": 100
+                },
+                "imgShadow": true,
+                "borderWidth": 3,
+                "borderStyle": "groove",
+                "borderColor": "#990f0f",
+                "imgShadowDx": 30,
+                "imgShadowDy": 30
+              }
+            },
+            {
+              "type": "checkbox",
+              "x": 32,
+              "y": 576,
+              "w": 176,
+              "h": 32,
+              "props": {
+                "z": 0,
+                "text": "Pippo",
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "labelGap": 10
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 320,
+              "y": 560,
+              "w": 304,
+              "h": 160,
+              "props": {
+                "z": 0,
+                "fontFamily": "Times New Roman",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(43,0,255,1)",
+                "strokeWidth": 2,
+                "items": [
+                  "Opzione A",
+                  "Opzione B",
+                  "Voce"
+                ],
+                "values": [],
+                "itemStyles": {
+                  "0": {
+                    "color": "rgba(254,11,11,1)"
+                  },
+                  "1": {
+                    "color": "rgba(17,255,0,1)"
+                  },
+                  "2": {
+                    "color": "rgba(166,0,255,1)",
+                    "fontSize": 35,
+                    "strokeWidth": 0.2,
+                    "shadowColor": "rgba(68,0,255,1)",
+                    "shadowBlur": 3,
+                    "fontWeight": 100,
+                    "fontFamily": "Courier New"
+                  }
+                },
+                "styleScope": -1,
+                "bgColor": "#ff0000",
+                "selectionStyle": "pills",
+                "bgBorderWidth": 3,
+                "bgBorderStyle": "ridge",
+                "bgRadius": 0,
+                "bgShadow": true,
+                "bgShadowColor": "#d91212",
+                "bgShadowDx": 6,
+                "bgShadowDy": 6,
+                "bgShadowBlur": 1,
+                "labelGap": 31,
+                "itemsGap": -20,
+                "pillBgOff": "rgba(255,10,10,0.2)",
+                "pillShadowDx": 3,
+                "pillShadowDy": 3,
+                "pillShadowColor": "rgba(102,0,0,0.8)",
+                "pillShadowBlur": 6,
+                "pillPadY": 9,
+                "pillPadX": 17,
+                "itemsDirection": "vertical",
+                "color": "rgba(253,18,18,1)",
+                "pillTextOffColor": "rgba(255,0,0,1)"
+              }
+            },
+            {
+              "type": "radiogroup",
+              "x": 32,
+              "y": 32,
+              "w": 400,
+              "h": 64,
+              "props": {
+                "z": 0,
+                "fontFamily": "Courier New",
+                "fontWeight": 900,
+                "italic": false,
+                "fontSize": 22,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,30,255,1)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(0,0,0,1)",
+                "strokeWidth": 0.5,
+                "items": [
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5"
+                ],
+                "value": 0,
+                "itemStyles": {
+                  "1": {
+                    "color": "rgba(128,255,0,1)"
+                  },
+                  "2": {
+                    "color": "rgba(212,255,0,1)"
+                  },
+                  "3": {
+                    "color": "rgba(255,162,0,1)"
+                  },
+                  "4": {
+                    "color": "rgba(255,0,0,1)"
+                  }
+                },
+                "styleScope": -1,
+                "color": "rgba(55,255,0,1)",
+                "shadow": true,
+                "selectionStyle": "likert",
+                "labelGap": 0,
+                "bgColor": "#ff0000",
+                "bgBorderColor": "#0091ff",
+                "bgRadius": 20,
+                "bgShadowColor": "#ff0000",
+                "bgShadowDx": 5,
+                "bgShadowDy": 5,
+                "bgShadowBlur": 1,
+                "values": [],
+                "likertHandleColor": "rgba(145,254,72,1)",
+                "itemsGap": 0,
+                "itemsDirection": "vertical",
+                "likertTrackColor": "rgba(255,5,5,0.77)",
+                "likertThumbColor": "rgba(100,2,12,1)",
+                "likertBorderColor": "rgba(115,0,255,1)",
+                "likertBorderWidth": 14,
+                "likertRadius": 99,
+                "likertHeight": 32,
+                "likertShadowColor": "rgba(0,255,110,1)",
+                "likertShadowDx": 5,
+                "likertShadowDy": 5,
+                "likertShadowBlur": 6
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 128,
+              "y": 576,
+              "w": 304,
+              "h": 128,
+              "props": {
+                "z": 0,
+                "fontFamily": "Times New Roman",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(43,0,255,1)",
+                "strokeWidth": 2,
+                "items": [
+                  "Opzione A",
+                  "Opzione B",
+                  "Voce"
+                ],
+                "values": [],
+                "itemStyles": {
+                  "0": {
+                    "color": "rgba(254,11,11,1)",
+                    "strokeWidth": 0.2
+                  },
+                  "1": {
+                    "color": "rgba(17,255,0,1)",
+                    "strokeWidth": 0.1,
+                    "fontWeight": 900
+                  },
+                  "2": {
+                    "color": "rgba(166,0,255,1)",
+                    "fontSize": 35,
+                    "strokeWidth": 0.2,
+                    "shadowColor": "rgba(68,0,255,1)",
+                    "shadowBlur": 3,
+                    "fontWeight": 100,
+                    "fontFamily": "Courier New"
+                  }
+                },
+                "styleScope": 1,
+                "bgColor": "#ff0000",
+                "selectionStyle": "standard",
+                "bgBorderWidth": 3,
+                "bgBorderStyle": "ridge",
+                "bgRadius": 0,
+                "bgShadow": true,
+                "bgShadowColor": "#d91212",
+                "bgShadowDx": 6,
+                "bgShadowDy": 6,
+                "bgShadowBlur": 1,
+                "labelGap": 30,
+                "itemsAlign": "start"
+              }
+            },
+            {
+              "type": "checkbox",
+              "x": 32,
+              "y": 608,
+              "w": 176,
+              "h": 32,
+              "props": {
+                "z": 0,
+                "text": "Pippo",
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "labelGap": 31,
+                "selectionStyle": "switch",
+                "switchBgOn": "rgba(0,255,94,1)",
+                "switchBgOff": "rgba(196,49,49,0.49)",
+                "switchBorderColor": "rgba(255,0,0,1)",
+                "switchBorderWidth": 2,
+                "switchShadowColor": "rgba(204,0,139,1)",
+                "switchShadowDx": 4,
+                "switchShadowDy": 4,
+                "switchShadowBlur": 6,
+                "switchKnobColor": "rgba(0,51,255,1)",
+                "alignH": "justify",
+                "alignV": "top"
+              }
+            },
+            {
+              "type": "radiogroup",
+              "x": 320,
+              "y": 112,
+              "w": 112,
+              "h": 112,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 2.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "#000000",
+                "strokeWidth": 0,
+                "items": [
+                  "Opzione A",
+                  "Opzione B",
+                  "Opzione C"
+                ],
+                "value": 0,
+                "itemStyles": {},
+                "styleScope": -1,
+                "color": "#ffffff",
+                "shadow": true,
+                "selectionStyle": "standard",
+                "labelGap": 8,
+                "itemsDirection": "vertical",
+                "itemsAlign": "end",
+                "itemsGap": 3
+              }
+            }
+          ]
+        },
+        {
+          "type": "step",
+          "title": "Nuovo step",
+          "aspect": "16:9",
+          "bgUrl": "",
+          "elements": [
+            {
+              "type": "textbox",
+              "x": 96,
+              "y": 96,
+              "w": 176,
+              "h": 48,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "placeholder": "Testo...",
+                "value": ""
+              }
+            },
+            {
+              "type": "image",
+              "x": 432,
+              "y": 256,
+              "w": 352,
+              "h": 240,
+              "props": {
+                "z": 0,
+                "url": "https://cdn.britannica.com/79/191679-050-C7114D2B/Adult-capybara.jpg",
+                "alt": "",
+                "fit": "resize",
+                "srcRect": {
+                  "x": 0,
+                  "y": 0,
+                  "w": 100,
+                  "h": 100
+                }
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 528,
+              "y": 80,
+              "w": 336,
+              "h": 48,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "items": [
+                  "Opzione A",
+                  "Opzione B"
+                ],
+                "values": [],
+                "itemStyles": {},
+                "styleScope": -1
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 80,
+              "y": 288,
+              "w": 304,
+              "h": 128,
+              "props": {
+                "z": 0,
+                "fontFamily": "Times New Roman",
+                "fontWeight": 400,
+                "italic": true,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(43,0,255,1)",
+                "strokeWidth": 2,
+                "items": [
+                  "Opzione A",
+                  "Opzione B",
+                  "Voce"
+                ],
+                "values": [],
+                "itemStyles": {
+                  "0": {
+                    "color": "rgba(254,11,11,1)"
+                  },
+                  "1": {
+                    "color": "rgba(17,255,0,1)"
+                  },
+                  "2": {
+                    "color": "rgba(166,0,255,1)",
+                    "fontSize": 35,
+                    "strokeWidth": 0.2,
+                    "shadowColor": "rgba(68,0,255,1)",
+                    "shadowBlur": 3,
+                    "fontWeight": 100,
+                    "fontFamily": "Courier New"
+                  }
+                },
+                "styleScope": -1,
+                "bgColor": "#ff0000",
+                "selectionStyle": "pills",
+                "bgBorderWidth": 3,
+                "bgBorderStyle": "ridge",
+                "bgRadius": 0,
+                "bgShadow": true,
+                "bgShadowColor": "#d91212",
+                "bgShadowDx": 6,
+                "bgShadowDy": 6,
+                "bgShadowBlur": 1,
+                "labelGap": 10,
+                "itemsGap": -20,
+                "pillBgOff": "rgba(255,10,10,0.2)",
+                "pillShadowDx": 3,
+                "pillShadowDy": 3,
+                "pillShadowColor": "rgba(102,0,0,0.8)",
+                "pillShadowBlur": 6,
+                "pillPadY": 9,
+                "pillPadX": 17,
+                "itemsDirection": "vertical",
+                "color": "rgba(253,18,18,1)",
+                "pillTextOffColor": "rgba(255,0,0,1)"
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 208,
+              "y": 512,
+              "w": 560,
+              "h": 128,
+              "props": {
+                "z": 0,
+                "fontFamily": "Courier New",
+                "fontWeight": 900,
+                "italic": false,
+                "fontSize": 26,
+                "fontSizeUnit": "px",
+                "letterSpacing": 1.1,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(245,0,0,1)",
+                "strokeWidth": 0.1,
+                "items": [
+                  "Opzione A",
+                  "Opzione B"
+                ],
+                "values": [],
+                "itemStyles": {
+                  "0": {
+                    "color": "rgba(212,0,255,0.35)"
+                  },
+                  "1": {
+                    "color": "rgba(255,115,0,0.35)"
+                  }
+                },
+                "styleScope": -1,
+                "itemsDirection": "horizontal",
+                "selectionStyle": "pills",
+                "labelGap": 23,
+                "itemsAlign": "start"
+              }
+            },
+            {
+              "type": "radiogroup",
+              "x": 112,
+              "y": 160,
+              "w": 752,
+              "h": 64,
+              "props": {
+                "z": 0,
+                "fontFamily": "Courier New",
+                "fontWeight": 100,
+                "italic": false,
+                "fontSize": 25,
+                "fontSizeUnit": "px",
+                "letterSpacing": 5.9,
+                "lineHeight": 0.7,
+                "shadowColor": "rgba(0,255,238,1)",
+                "shadowDx": 5,
+                "shadowDy": 6,
+                "shadowBlur": 6,
+                "strokeColor": "rgba(0,30,255,1)",
+                "strokeWidth": 0.5,
+                "items": [
+                  "Opzione A",
+                  "Opzione B",
+                  "Voce"
+                ],
+                "value": 0,
+                "itemStyles": {
+                  "0": {
+                    "fontWeight": 900
+                  },
+                  "1": {
+                    "fontWeight": 900
+                  },
+                  "2": {
+                    "fontWeight": 900,
+                    "letterSpacing": 0.4,
+                    "italic": false
+                  }
+                },
+                "styleScope": -1,
+                "selectionStyle": "likert",
+                "values": [],
+                "itemsAlign": "start",
+                "likertThumbColor": "rgba(128,0,255,1)",
+                "likertTrackColor": "rgba(0,64,255,0.25)",
+                "likertBorderColor": "rgba(0,98,255,1)",
+                "likertBorderWidth": 1,
+                "likertRadius": 15,
+                "likertHeight": 33,
+                "likertShadowColor": "rgba(102,0,255,1)",
+                "likertShadowDx": 4,
+                "likertShadowDy": 4,
+                "likertShadowBlur": 8,
+                "labelGap": 5,
+                "itemsDirection": "vertical",
+                "color": "rgba(185,195,198,1)",
+                "itemsGap": 7
+              }
+            },
+            {
+              "type": "radiogroup",
+              "x": 320,
+              "y": 80,
+              "w": 176,
+              "h": 48,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "items": [
+                  "Opzione A",
+                  "Opzione B"
+                ],
+                "value": 0,
+                "itemStyles": {},
+                "styleScope": -1,
+                "itemsAlign": "end"
+              }
+            }
+          ]
+        }
+      ],
+      "collapsed": false
+    }
+  ]
+}
