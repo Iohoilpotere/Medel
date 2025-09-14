@@ -9,8 +9,22 @@ class Registry {
   createProperty(type, opts){ const C = this.properties.get(type); if(!C) throw new Error(`Proprietà non trovata: ${type}`); return new C(opts); }
 }
 export const registry = new Registry();
-const toAbs = p => p.startsWith('/')? p : '/' + p.replace(/^\.\/?/, '');
 export async function loadModules(){  
-  const m = await (await fetch('./js/manifest.json')).json();
-  await Promise.all([ ...m.elements.map(x=> import(toAbs(x))), ...m.properties.map(x=> import(toAbs(x))) ]);
+  // Manifest relativo alla pagina (funziona sia in Live Server che su GitHub Pages)
+  const manifestUrl = new URL('./js/manifest.json', window.location.href);
+  const res = await fetch(manifestUrl, { cache: 'no-store' });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Manifest non trovato (${res.status}) at ${manifestUrl}\n${txt.slice(0,200)}`);
+  }
+  const m = await res.json();
+
+  // Converte "/js/..." o "js/..." in un URL relativo alla pagina corrente
+  const toUrl = (p) => new URL(p.replace(/^\/+/, './'), window.location.href).toString();
+
+  await Promise.all([
+    ...m.elements.map(x => import(toUrl(x))),
+    ...m.properties.map(x => import(toUrl(x)))
+  ]);
 }
+
