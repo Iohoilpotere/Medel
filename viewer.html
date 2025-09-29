@@ -1,0 +1,57 @@
+
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Viewer – Caso Clinico</title>
+  <link rel="icon" href="./favicon.ico"/>
+  <link rel="stylesheet" href="./css/base.css"/>
+  <link rel="stylesheet" href="./css/stage.css"/>
+  <link rel="stylesheet" href="./css/panels.css"/>
+  <link rel="stylesheet" href="./css/viewer.css"/>
+</head>
+<body>
+  <div class="viewer">
+    <aside class="left">
+      <div class="header">
+        <div class="title">Step</div>
+        <button id="collapseSteps" class="collapse" title="Comprimi/espandi">≪</button>
+      </div>
+      <div class="steps"></div>
+    </aside>
+    <main class="center">
+      <div class="indicators" id="indicatorsBar"></div>
+      <div class="canvasHost"><div id="viewerStage" class="stageWrap"></div></div>
+      <div class="footer">
+        <button class="btn" id="nextBtn">Avanti</button>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="./viewer.js"></script>
+
+<button id="btnImportJson" style="position:fixed;top:8px;right:12px;z-index:1000" class="btn btn-sm">Importa JSON</button>
+<input id="fileImportJson" type="file" accept=".json,application/json" style="display:none" />
+<script>
+(function(){
+  const btn = document.getElementById('btnImportJson');
+  const file = document.getElementById('fileImportJson');
+  if(btn && file){
+    btn.addEventListener('click', ()=> file.click());
+    file.addEventListener('change', async ()=>{
+      const f = file.files && file.files[0]; if(!f) return;
+      try{
+        const txt = await f.text();
+        const data = JSON.parse(txt);
+        if(window.Viewer && typeof window.Viewer.loadProject === 'function'){
+          window.Viewer.loadProject(data);
+        }else if(window.loadProject){ window.loadProject(data); }
+        else { try{ sessionStorage.setItem('viewer_project', JSON.stringify(data)); location.reload(); }catch(e){ console.warn('API viewer loadProject non trovata e fallback fallito', e); } }
+      }catch(err){ alert('JSON non valido: '+err.message); }
+      file.value='';
+    });
+  }
+})();
+</script>
+</body>
+</html>

@@ -7,7 +7,8 @@
     "/js/elements/radiogroup-element.js",
     "/js/elements/checkboxgroup-element.js",
     "/js/elements/pdf-element.js",
-    "/js/elements/pairs-element.js"
+    "/js/elements/pairs-element.js",
+    "/js/elements/tablecheck-element.js"
   ],
   "properties": [
     "/js/properties/alignment.js",
@@ -45,6 +46,11 @@
     "/js/properties/text-content.js",
     "/js/properties/text-placeholder.js",
     "/js/properties/text-shadow-adv.js",
-    "/js/properties/text.js"
+    "/js/properties/text.js",
+    "/js/properties/table-items.js",
+    "/js/properties/table-rows-content.js",
+    "/js/properties/table-label-style.js",
+    "/js/properties/table-headers.js",
+    "/js/properties/lock-on-select.js"
   ]
 }

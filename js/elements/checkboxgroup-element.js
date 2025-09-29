@@ -82,7 +82,10 @@ export class CheckboxGroupElement extends BaseElement{
         }
         b.addEventListener('click', ()=>{
           const set=new Set(this.getProp('values')||[]);
-          if(set.has(i)) set.delete(i); else set.add(i);
+          const _lockOn=!!this.getProp('lockOnSelect');
+          const isOn=set.has(i);
+          if(_lockOn && isOn){ return; }
+          if(isOn) set.delete(i); else set.add(i);
           this.setProp('values', Array.from(set), {silent:true});
           // re-render
           this.updateDom();
@@ -181,6 +184,11 @@ export class CheckboxGroupElement extends BaseElement{
       input.type='checkbox';
       input.checked = valuesSet.has(i);
       input.addEventListener('change', ()=>{
+        const _lockOn=!!this.getProp('lockOnSelect');
+        if(_lockOn){
+          if(!input.checked && input.dataset.locked==='1'){ input.checked=true; return; }
+          if(input.checked){ input.dataset.locked='1'; }
+        }
         if(input.checked) valuesSet.add(i); else valuesSet.delete(i);
         this.setProp('values', Array.from(valuesSet), {silent:true});
       });

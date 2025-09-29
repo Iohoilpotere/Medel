@@ -1,12 +1,21 @@
 {
+  "indicators": [
+    {
+      "id": "mfmy19n3kljsd",
+      "name": "Salute",
+      "image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTNQ21pkC2Q8KoO53NiRH6Nd-a9IZCSIeJ9xQ&s",
+      "prefix": "",
+      "suffix": ""
+    }
+  ],
   "steps": [
     {
       "type": "category",
-      "title": "Categoria",
+      "title": "Capibara",
       "children": [
         {
           "type": "step",
-          "title": "Step 1",
+          "title": "Capybara step",
           "aspect": "16:9",
           "bgUrl": "https://static.vecteezy.com/system/resources/previews/043/779/032/non_2x/dynamic-navy-blue-stucco-texture-with-spotlight-abstract-grunge-accent-piece-on-wide-angle-background-photo.jpg",
           "elements": [
@@ -71,9 +80,9 @@
             {
               "type": "image",
               "x": 32,
-              "y": 96,
+              "y": 128,
               "w": 400,
-              "h": 416,
+              "h": 384,
               "props": {
                 "z": 0,
                 "url": "https://cdn.britannica.com/79/191679-050-C7114D2B/Adult-capybara.jpg",
@@ -95,9 +104,9 @@
             },
             {
               "type": "checkbox",
-              "x": 32,
-              "y": 576,
-              "w": 176,
+              "x": 176,
+              "y": 688,
+              "w": 80,
               "h": 32,
               "props": {
                 "z": 0,
@@ -192,7 +201,7 @@
               "x": 32,
               "y": 32,
               "w": 400,
-              "h": 64,
+              "h": 96,
               "props": {
                 "z": 0,
                 "fontFamily": "Courier New",
@@ -260,9 +269,9 @@
             },
             {
               "type": "checkboxgroup",
-              "x": 128,
-              "y": 576,
-              "w": 304,
+              "x": 160,
+              "y": 560,
+              "w": 144,
               "h": 128,
               "props": {
                 "z": 0,
@@ -322,9 +331,9 @@
             },
             {
               "type": "checkbox",
-              "x": 32,
-              "y": 608,
-              "w": 176,
+              "x": 176,
+              "y": 656,
+              "w": 96,
               "h": 32,
               "props": {
                 "z": 0,
@@ -359,8 +368,8 @@
             },
             {
               "type": "radiogroup",
-              "x": 320,
-              "y": 112,
+              "x": 32,
+              "y": 576,
               "w": 112,
               "h": 112,
               "props": {
@@ -395,11 +404,32 @@
                 "itemsGap": 3
               }
             }
-          ]
+          ],
+          "logic": {
+            "nextEnabledIf": {
+              "op": "all",
+              "rules": [
+                {
+                  "type": "element",
+                  "ref": "el_4",
+                  "pred": {
+                    "kind": "interacted",
+                    "value": null
+                  }
+                }
+              ]
+            },
+            "next": {
+              "type": "sequential"
+            },
+            "readOnlyAfterAdvance": false,
+            "exclusiveGroup": null,
+            "unlockedIf": null
+          }
         },
         {
           "type": "step",
-          "title": "Nuovo step",
+          "title": "Step di controllo",
           "aspect": "16:9",
           "bgUrl": "",
           "elements": [
@@ -430,8 +460,8 @@
             },
             {
               "type": "image",
-              "x": 432,
-              "y": 256,
+              "x": 176,
+              "y": 224,
               "w": 352,
               "h": 240,
               "props": {
@@ -451,7 +481,7 @@
               "type": "checkboxgroup",
               "x": 528,
               "y": 80,
-              "w": 336,
+              "w": 128,
               "h": 48,
               "props": {
                 "z": 0,
@@ -479,10 +509,10 @@
             },
             {
               "type": "checkboxgroup",
-              "x": 80,
-              "y": 288,
+              "x": 32,
+              "y": 240,
               "w": 304,
-              "h": 128,
+              "h": 160,
               "props": {
                 "z": 0,
                 "fontFamily": "Times New Roman",
@@ -543,13 +573,14 @@
                 "pillPadX": 17,
                 "itemsDirection": "vertical",
                 "color": "rgba(253,18,18,1)",
-                "pillTextOffColor": "rgba(255,0,0,1)"
+                "pillTextOffColor": "rgba(255,0,0,1)",
+                "lockOnSelect": true
               }
             },
             {
               "type": "checkboxgroup",
-              "x": 208,
-              "y": 512,
+              "x": 48,
+              "y": 480,
               "w": 560,
               "h": 128,
               "props": {
@@ -676,6 +707,159 @@
                 "itemStyles": {},
                 "styleScope": -1,
                 "itemsAlign": "end"
+              }
+            },
+            {
+              "type": "tablecheck",
+              "x": 528,
+              "y": 224,
+              "w": 736,
+              "h": 480,
+              "props": {
+                "z": 0,
+                "items": [
+                  "Test 1",
+                  "Voce C",
+                  "Voce",
+                  "Pressoligitirizzasingione",
+                  "Voce Brutta"
+                ],
+                "rowsContent": {
+                  "Test 1": "",
+                  "Voce C": "",
+                  "Pressoligitirizzasingione": "<div class=\"le-guide row-fluid\"><div class=\"div_topbanner\">  <script data-cfasync=\"false\" async=\"\" type=\"text/javascript\" src=\"//s.clickiocdn.com/t/201911/360_light.js\"></script> <script class=\"__lxGc__\" type=\"text/javascript\">((__lxGc__=window.__lxGc__||{'s':{},'b':0})['s']['_201911']=__lxGc__['s']['_201911']||{'b':{}})['b']['_641674']={'i':__lxGc__.b++};</script>  <script data-cfasync=\"false\" async=\"\" type=\"text/javascript\" src=\"//s.clickiocdn.com/t/201911/360_light.js\"></script> <script class=\"__lxGc__\" type=\"text/javascript\">((__lxGc__=window.__lxGc__||{'s':{},'b':0})['s']['_201911']=__lxGc__['s']['_201911']||{'b':{}})['b']['_641668']={'i':__lxGc__.b++};</script> </div><div class=\"titolo\"> <span style=\"opacity: 0.7\"> <a href=\"https://www.laleggepertutti.it/category/diritto-e-fisco\" title=\"Diritto e Fisco\">Diritto e Fisco</a> </span> | \n Articoli</div><h1> Il proprietario può imporre le spese straordinarie all’inquilino?</h1><div class=\"auther-details-dup\"> 17 Maggio 2024<span> | Autore: </span><a href=\"https://www.laleggepertutti.it/author/angelo-greco\" title=\"Articoli scritti da Angelo Greco\" rel=\"author\">Angelo Greco</a></div><div class=\"row\"><div class=\"col-sm-7 custom-box4\" style=\"height: 255.243px;\"><div class=\"le-guide-img\"><div class=\"le-guide-img2\"> <noscript><img width=\"600\" height=\"343\" src=\"https://www.laleggepertutti.it/wp-content/uploads/2024/05/affitto-contratto-600x343.jpeg\" class=\"attachment-single wp-post-image\" alt=\"Il proprietario può imporre le spese straordinarie all’inquilino?\" title=\"Il proprietario può imporre le spese straordinarie all’inquilino?\" /></noscript><img width=\"600\" height=\"343\" src=\"https://www.laleggepertutti.it/wp-content/uploads/2024/05/affitto-contratto-600x343.jpeg\" data-src=\"https://www.laleggepertutti.it/wp-content/uploads/2024/05/affitto-contratto-600x343.jpeg\" class=\"attachment-single wp-post-image lazyloaded\" alt=\"Il proprietario può imporre le spese straordinarie all’inquilino?\" title=\"Il proprietario può imporre le spese straordinarie all’inquilino?\"></div></div></div><div class=\"col-sm-5\" style=\"height: 255.243px;\"><div> <script async=\"\" type=\"text/clickiocmp\" data-clickio-cmp-paywall-subscribed=\"0\" src=\"https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js\"></script>  <ins class=\"adsbygoogle\" style=\"display:inline-block;width:300px;height:250px\" data-ad-client=\"ca-pub-5723394903230647\" data-ad-slot=\"3723850812\"></ins> <script>(adsbygoogle = window.adsbygoogle || []).push({});</script> </div></div></div></div>",
+                  "Voce Brutta": "",
+                  "Voce": ""
+                },
+                "labelStyles": {
+                  "Voce A": {
+                    "fontSize": 21
+                  }
+                },
+                "values": [],
+                "fontFamily": "System",
+                "fontSize": 16,
+                "padding": 11,
+                "rowBg": "transparent",
+                "keyColWidth": 38,
+                "headerKeys": "Pippo",
+                "headerValues": "Pippa",
+                "lockOnSelect": true
+              }
+            },
+            {
+              "type": "checkboxgroup",
+              "x": 896,
+              "y": 64,
+              "w": 128,
+              "h": 112,
+              "props": {
+                "z": 0,
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "items": [
+                  "Bloccami",
+                  "Puppa",
+                  "Pino",
+                  "Test"
+                ],
+                "values": [],
+                "itemStyles": {},
+                "styleScope": -1,
+                "lockOnSelect": true
+              }
+            },
+            {
+              "type": "checkbox",
+              "x": 160,
+              "y": 608,
+              "w": 176,
+              "h": 32,
+              "props": {
+                "z": 0,
+                "text": "Fissa",
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 2.7,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "selectionStyle": "switch",
+                "labelGap": 25,
+                "lockOnSelect": true,
+                "color": "rgba(255,0,0,1)"
+              }
+            },
+            {
+              "type": "checkbox",
+              "x": 160,
+              "y": 640,
+              "w": 176,
+              "h": 32,
+              "props": {
+                "z": 0,
+                "text": "Mobile",
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 2.7,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "selectionStyle": "switch",
+                "labelGap": 25,
+                "lockOnSelect": false,
+                "color": "rgba(55,255,0,1)"
+              }
+            },
+            {
+              "type": "checkbox",
+              "x": 336,
+              "y": 608,
+              "w": 176,
+              "h": 48,
+              "props": {
+                "z": 0,
+                "text": "Fissa normale",
+                "fontFamily": "System",
+                "fontWeight": 400,
+                "italic": false,
+                "fontSize": 16,
+                "fontSizeUnit": "px",
+                "letterSpacing": 0,
+                "lineHeight": 1.2,
+                "shadowColor": "rgba(0,0,0,0.5)",
+                "shadowDx": 0,
+                "shadowDy": 0,
+                "shadowBlur": 6,
+                "strokeColor": null,
+                "strokeWidth": 0,
+                "labelGap": 13,
+                "lockOnSelect": true
               }
             }
           ]

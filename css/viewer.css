@@ -1,0 +1,97 @@
+
+:root{
+  --viewer-bg: #0f1015;
+  --panel-bg: #151822;
+  --panel-border: rgba(255,255,255,0.08);
+  --text: #e7e7ea;
+  --muted: #a4a7b3;
+  --accent: #7c3aed;
+}
+html, body { height:100%; margin:0; background: var(--viewer-bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+.viewer { display:grid; grid-template-columns: 280px 1fr; grid-template-rows: auto 1fr auto; height:100%; }
+.viewer .left { grid-row: 1 / span 3; grid-column: 1; background: var(--panel-bg); border-right:1px solid var(--panel-border); display:flex; flex-direction:column; min-width:0; }
+.viewer .left .header { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--panel-border); }
+.viewer .left .steps { overflow:auto; padding:8px; }
+.viewer .left .steps button.step { width:100%; text-align:left; display:block; padding:10px 12px; margin:6px 0; border-radius:10px; border:1px solid var(--panel-border); background:transparent; color:inherit; cursor:pointer; }
+.viewer .left .steps button.step.active { border-color: var(--accent); background: rgba(124,58,237,0.14); }
+.viewer .left.collapsed { width:56px; grid-template-columns: 56px; }
+.viewer .left.collapsed .title { display:none; }
+.viewer .left.collapsed .steps { display:none; }
+.viewer .left .collapse { background:transparent; border:1px solid var(--panel-border); border-radius:8px; color:inherit; cursor:pointer; padding:6px 8px; }
+.viewer .center { grid-column: 2; grid-row: 1 / span 3; display:grid; grid-template-rows: auto 1fr auto; min-width:0; }
+.viewer .indicators { display:flex; gap:14px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--panel-border); background: rgba(255,255,255,0.02); }
+.viewer .indicator { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px; background: rgba(255,255,255,0.03); border:1px solid var(--panel-border); }
+.viewer .indicator .avatar { width:28px; height:28px; border-radius:999px; background:#222; background-size:cover; background-position:center; flex-shrink:0; }
+.viewer .indicator .val { display:flex; gap:4px; color: var(--text); }
+.viewer .indicator .pref, .viewer .indicator .suf { color: var(--muted); }
+.viewer .canvasHost { position:relative; overflow:auto; background: #0b0c11; display:flex; align-items:center; justify-content:center; }
+.viewer .stageWrap { position:relative; width: 100%; height: 100%; }
+.viewer .footer { display:flex; align-items:center; justify-content:flex-end; padding:10px 14px; border-top:1px solid var(--panel-border); }
+.viewer .btn { background: var(--accent); border:none; color:white; border-radius:10px; padding:12px 16px; cursor:pointer; font-weight:600; }
+.viewer .btn:disabled { opacity:.5; cursor:not-allowed; }
+.viewer .tooltip { position:relative; }
+.viewer .tooltip:hover .tip { opacity:1; transform: translateY(0); pointer-events:auto; }
+.viewer .tip { position:absolute; bottom:100%; left:50%; transform: translate(-50%, 8px); opacity:0; pointer-events:none; transition: .16s ease; background:#000; color:#fff; border-radius:8px; padding:6px 8px; font-size:12px; white-space:nowrap; border:1px solid var(--panel-border); }
+.viewer .stageHost .handles, .viewer .stageHost .handle, .viewer .stageHost .delete { display:none !important; }
+.viewer .stageHost .element { pointer-events:auto; }
+
+/* Viewer overrides: no design grid, only stage border */
+.viewer .stage .grid{ display:none !important; }
+.viewer .indicators{ overflow:visible; position:relative; }
+.viewer .indicator .tip{ top:100%; bottom:auto; transform: translate(-50%, 8px); } /* show below */
+
+.viewer .stageHost .handles, .viewer .stageHost .delete{ display:none !important; }
+
+/* Inline indicator name toggle */
+.viewer .indicator { position: relative; }
+.viewer .indicator .name-inline{
+  display:none;
+  margin-left:6px;
+  font-weight:600;
+  opacity:.9;
+}
+.viewer .indicator.active .name-inline{ display:inline; }
+.viewer .indicators { flex-wrap: wrap; }
+.viewer .indicator .tip {
+  top: 100%;
+  bottom: auto;
+  transform: translate(-50%, 8px);
+  z-index: 10;
+}
+/* Locked steps */
+.viewer .left .steps button.step[disabled]{
+  opacity:.45;
+  cursor:not-allowed;
+}
+
+/* Fullscreen layout without scrollbars in the stage area */
+html, body { height:100%; overflow:hidden; }
+.viewer { height:100vh; }
+.viewer .center { overflow:hidden; }
+.viewer .canvasHost { overflow:hidden; }
+.stage-host{ padding:0 !important; } /* override editor padding */
+
+.viewer .center{ display:grid; grid-template-rows:auto 1fr auto; height:100%; }
+
+/* Ensure canvasHost centers content both axes and fills row */
+.viewer .canvasHost{ display:flex; align-items:center; justify-content:center; height:100%; overflow:hidden; }
+/* Center the stage block itself */
+.viewer .canvasHost > .stage { margin:auto; }
+/* Step buttons indentation is visual margin-left per depth */
+.viewer .left .steps button.step{ position:relative; }
+
+/* No scrollbars in steps panel; truncate long labels */
+.viewer .left .steps{ overflow:hidden; padding:8px; }
+.viewer .left .steps button.step{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Grid columns adapt when left is collapsed */
+.viewer{ grid-template-columns: 280px 1fr; }
+.viewer.collapsed-left{ grid-template-columns: 56px 1fr; }
+/* Ensure center stretches when sidebar collapses */
+.viewer .center{ width:100%; }
+
+/* Symmetric horizontal spacing for step buttons */
+.viewer .left .steps button.step{
+  width:auto;           /* fill remaining space minus margins */
+  margin:6px 8px;       /* 8px gap on both sides */
+  box-sizing:border-box;
+}

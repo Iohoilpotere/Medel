@@ -29,6 +29,34 @@ export class CheckboxElement extends BaseElement{
     label.style.userSelect='none';
     const input = document.createElement('input');
     input.type='checkbox';
+      // lock-on-select guards (single checkbox)
+      input.addEventListener('mousedown', (e)=>{
+        const _lock = !!this.getProp('lockOnSelect');
+        if(_lock && input.checked && input.dataset && input.dataset.locked==='1'){
+          e.preventDefault(); e.stopPropagation();
+        }
+      }, true);
+      input.addEventListener('keydown', (e)=>{
+        const _lock = !!this.getProp('lockOnSelect');
+        const key = e.key || e.code;
+        if(_lock && input.checked && input.dataset && input.dataset.locked==='1' && (key===' ' || key==='Space' || key==='Enter' || key==='Spacebar')){
+          e.preventDefault(); e.stopPropagation();
+        }
+      });
+      input.addEventListener('change', (e)=>{
+        const _lock = !!this.getProp('lockOnSelect');
+        if(!_lock) return;
+        if(input.dataset && input.dataset.locked==='1' && !input.checked){
+          input.checked = true;
+          return;
+        }
+        if(input.checked){
+          if(!input.dataset) input.dataset = {};
+          input.dataset.locked = '1';
+        }
+      });
+      const _lockOn = !!this.getProp('lockOnSelect');
+      input.dataset.locked = input.checked && _lockOn ? '0' : '0';
     label.appendChild(input);
     const txt = document.createElement('span');
     txt.textContent = ' ' + String(this.getProp('text') ?? '');
@@ -98,9 +126,9 @@ export class CheckboxElement extends BaseElement{
         knob.style.left = input.checked ? (w - (sbw*zoom) - kSize) + 'px' : (sbw*zoom) + 'px';
       };
       input.addEventListener('change', updateSwitch);
-      label.addEventListener('click', (e)=>{
-        if(e.target===input) return;
-        input.checked = !input.checked; 
+      input.addEventListener('click', (e)=>{ const _lockOn=!!this.getProp('lockOnSelect'); if(_lockOn && input.dataset.locked==='1' && input.checked){ e.preventDefault(); e.stopPropagation(); }});
+      input.addEventListener('change', (e)=>{ const _lockOn=!!this.getProp('lockOnSelect'); if(_lockOn && input.checked){ input.dataset.locked='1'; } });
+label.addEventListener('click', (e)=>{ if(e.target===input) return; const _lockOn=!!this.getProp('lockOnSelect'); if(_lockOn && input.checked){ e.preventDefault(); e.stopPropagation(); return; } input.checked = !input.checked; 
         updateSwitch(); 
         e.preventDefault(); e.stopPropagation();
         if(typeof input.onchange==='function') input.onchange(e);

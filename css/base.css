@@ -298,3 +298,7 @@ button:hover,select:hover,input:hover{border-color:var(--accent)}
 .rightpane .color-with-alpha input[type="text"]{ flex:1 1 auto; min-width:0; max-width:100%; }
 .rightpane .color-with-alpha input[type="number"]{ flex:0 0 64px; min-width:0; }
 .rightpane .bg-input{ width:100%; max-width:100%; }
+
+/* TableCheckElement */
+.element.tablecheck .content table{ color: inherit; }
+.element.tablecheck .content th, .element.tablecheck .content td{ border-color: var(--panel-border, rgba(255,255,255,0.15)); }
