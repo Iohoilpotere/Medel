@@ -1,3 +1,5 @@
+import CONFIG from '../../js/config/app-config.js';
+import { applyTextStyleToAll } from '../utils/text-style.js';
 
 import { registry } from '../core/registry.js';
 import { BaseElement } from './base-element.js';
@@ -47,7 +49,7 @@ export class TableCheckElement extends BaseElement{
     const thead = document.createElement('thead');
     const trh = document.createElement('tr'); thead.appendChild(trh);
     const th1 = document.createElement('th'); const th2 = document.createElement('th');
-    const headBg = '#0e0e0e'; // opaque header background to mask rows while scrolling
+    const headBg = CONFIG.UI_DEFAULT_COLOR_TEXT; // opaque header background to mask rows while scrolling
     for(const th of [th1,th2]){
       th.style.position='sticky'; th.style.top='0'; th.style.zIndex='1';
       th.style.textAlign='left'; th.style.padding=(this.getProp('padding')*0.75||8)+'px';
@@ -68,32 +70,32 @@ export class TableCheckElement extends BaseElement{
 
     items.forEach(key=>{
       const tr = document.createElement('tr');
+      tr.dataset.rowkey = String(key);
       tr.style.background = this.getProp('rowBg')||'transparent';
 
       const td1 = document.createElement('td');
       // lock-on-select: prevent deselect of already selected rows (capture)
       td1.addEventListener('click', (e)=>{
-        const _lockOn = !!this.getProp('lockOnSelect');
-        if(!_lockOn) return;
-        const cur = new Set(Array.isArray(this.getProp('values'))? this.getProp('values'):[]);
-        if(cur.has(key)) { e.preventDefault(); e.stopPropagation(); return; }
+        const cb2 = lab && lab.querySelector ? lab.querySelector('input[type=checkbox]') : null;
+        if(cb2 && cb2.dataset && cb2.dataset.locked==='1') { e.preventDefault(); e.stopPropagation(); return; }
       }, true);
       td1.style.verticalAlign='top';
       td1.style.padding=(this.getProp('padding')||11)+'px';
       td1.style.borderBottom='1px solid rgba(255,255,255,0.15)';
       const lab = document.createElement('label'); lab.style.display='flex'; lab.style.alignItems='flex-start'; lab.style.gap=(this.getProp('padding')||11)+'px';
       const cb = document.createElement('input'); cb.type='checkbox'; cb.checked = values.has(key);
-      cb.addEventListener('click', (e)=>{
+      cb.addEventListener('change', (e)=>{
         e.stopPropagation();
-        const _lockOn = !!this.getProp('lockOnSelect');
-        if(_lockOn && values.has(key) && cb.checked === false){
-          cb.checked = true;
-          return;
-        }
-        const cur = new Set(Array.from(values));
+        const cur = new Set(Array.isArray(this.getProp('values')) ? this.getProp('values') : []);
         if(cb.checked) cur.add(key); else cur.delete(key);
         updateValues(Array.from(cur));
-        details.style.display = cb.checked ? 'block' : 'none';
+        // Show/hide details immediately based on current checkbox state
+        try{
+          const tr = cb.closest('tr');
+          const det = tr ? tr.querySelector('td:nth-child(2) div') : null;
+          if(det){ det.style.display = cb.checked ? 'block' : 'none'; }
+        }catch(_){}
+    
       });
       const sp = document.createElement('span'); sp.textContent = key;
       const st = labelStyles[key]||{};
@@ -110,7 +112,7 @@ export class TableCheckElement extends BaseElement{
       td2.style.padding=(this.getProp('padding')||11)+'px';
       td2.style.borderBottom='1px solid rgba(255,255,255,0.15)';
       const details = document.createElement('div');
-      details.style.display = values.has(key)? 'block':'none';
+      details.style.display = 'none';
       details.style.whiteSpace='normal';
       details.style.wordBreak='break-word';
       details.style.overflowWrap='anywhere';
@@ -121,9 +123,58 @@ export class TableCheckElement extends BaseElement{
       td2.appendChild(details);
 
       tr.appendChild(td1); tr.appendChild(td2);
-      tbody.appendChild(tr);
+      
+      // Helper: sync details visibility for all rows based on current 'values'
+      const syncDetailsFromValues = ()=>{
+        try{
+          const cur = new Set(Array.isArray(this.getProp('values'))? this.getProp('values'):[]);
+          tbody.querySelectorAll('tr').forEach((tr)=>{
+            const keyTxt = (tr.querySelector('label span') ? tr.querySelector('label span').textContent : undefined);
+            const det = tr.querySelector('td:nth-child(2) div');
+            const isOn = keyTxt!=null && cur.has(keyTxt);
+            if(det) det.style.display = isOn ? 'block' : 'none';
+          });
+        }catch(_){}
+      };
+    tbody.appendChild(tr);
     });
-  }
-}
+    // Initial sync of row details (immediate + deferred) to prevent race with persistence apply
+    try{ syncDetailsFromValues(); }catch(_){}
+    try{ requestAnimationFrame(()=> syncDetailsFromValues()); }catch(_){}
+    try{ setTimeout(()=> syncDetailsFromValues(), CONFIG.DETAIL_SYNC_DELAY_MS); }catch(_){}
+    try{ setTimeout(()=> syncDetailsFromValues(), CONFIG.INPUT_DEBOUNCE_MS); }catch(_){}
+
+    // Observer: update details visibility on confirm and apply lock to selected inputs
+    try{
+      const bus = this.stage && this.stage.bus;
+      const updateFromState = (confirmed)=>{
+        const cur = new Set(Array.isArray(this.getProp('values'))? this.getProp('values'):[]);
+        // iterate rows
+        tbody.querySelectorAll('tr').forEach((tr)=>{
+          const cbEl = tr.querySelector('input[type=checkbox]');
+          const keyTxt = (tr.querySelector('label span') ? tr.querySelector('label span').textContent : undefined);
+          const det = tr.querySelector('td:nth-child(2) div');
+          const isOn = keyTxt!=null && cur.has(keyTxt);
+          if(det) det.style.display = isOn ? 'block' : 'none';
+          if(cbEl && cbEl.dataset){
+            // lock only if property enabled
+            if(!!this.getProp('lockOnSelect')){
+              cbEl.dataset.locked = (confirmed && isOn) ? '1' : '0';
+            }else{
+              cbEl.dataset.locked = '0';
+            }
+          }
+        });
+      };
+      if(bus){
+        bus.on('step-state', (st)=> updateFromState(!!(st && st.confirmed)));
+        bus.on('step-confirmed', ()=> updateFromState(true));
+      }
+    }catch(_e){}
+    
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}}
 TableCheckElement.type='tablecheck';
 registry.registerElement(TableCheckElement.type, TableCheckElement);

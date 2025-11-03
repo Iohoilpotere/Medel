@@ -7,7 +7,32 @@ export class BaseElement{
     this.x=x; this.y=y; this.w=w; this.h=h;
     this.props = new Map();
     this.props.set('z', Number(z)||0);
-    // relative ratios (initialized on attach)
+    // Ensure default id/name props exist for export and uniqueness handling
+    (function(_self){
+      try{
+        // Generate a short random id
+        const rnd = Math.random().toString(36).slice(2,8);
+        const type = (_self.constructor && _self.constructor.type) || 'el';
+        const curId = _self.props.get('id');
+        const curName = _self.props.get('name');
+        if(!curId){
+          _self.props.set('id', `${type}-${rnd}`);
+        }
+        if(!curName){
+          _self.props.set('name', _self.props.get('id'));
+        }
+      }catch(e){ /* ignore */ }
+    })(this);
+    // Coerce broken id values (e.g., arrays/objects) into a valid string id
+    try{
+      const cur = this.props.get('id');
+      if(typeof cur !== 'string'){ 
+        const rnd = Math.random().toString(36).slice(2,8);
+        const type = (this.constructor && this.constructor.type) || 'el';
+        this.props.set('id', `${type}-${rnd}`);
+      }
+    }catch(e){ /* ignore */ }
+// relative ratios (initialized on attach)
     this._rx=null; this._ry=null; this._rw=null; this._rh=null;
   }
   attach(stage){

@@ -12,6 +12,7 @@ import { StepsPanel } from './panels/steps-panel.js';
 import { PropertiesPanel } from './panels/properties-panel.js';
 import { IndicatorsPanel } from './panels/indicators-panel.js';
 import { IndicatorsStore } from './models/indicators-store.js';
+import { FlagsStore } from './models/flags-store.js';
 import { UpdateStageBgCommand } from './core/commands/update-stage-bg.js';
 import { PositionSizeBatchCommand } from './core/commands/position-size-batch.js';
 import { CropTool } from './tools/crop-tool.js';
@@ -58,13 +59,14 @@ export class App{
     this.theme.set('dark');
     const host = $('#stageHost');
     this.stage = new Stage(host, {gridSize:16, aspect:'16:9'});
-    this.stage.bus.on('elements-changed', ()=>{ this._captureState(); this.propertiesPanel.render(); this.stepsPanel?.render(); });
+    this.stage.bus.on('elements-changed', ()=>{ this._captureState(); this.propertiesPanel?.render(); this.stepsPanel?.render(); });
     this.stage.bus.on('selection-changed', ()=> this.propertiesPanel.render());
     this.stage.bus.on('interaction', (evt)=>{ this.cmd.execute(new PositionSizeBatchCommand(evt.before, evt.after)); this._renderHistory(); });
     this.cmd.onChange(()=>{ this._captureState(); this._renderHistory(); this.stepsPanel?.render(); });
     this._wireUi();
     this.elementsPanel = new ElementsPanel(this);
     this.stepsPanel = new StepsPanel(this);
+    this.flags = new FlagsStore(this.project);
     this.indicators = new IndicatorsStore(this.project);
     this.indicatorsPanel = new IndicatorsPanel(this);
     this.propertiesPanel = new PropertiesPanel(this);
@@ -85,7 +87,8 @@ export class App{
     this.cmd = new CommandManager();
     this.cmd.onChange(()=>{ this._captureState(); this._renderHistory(); this.stepsPanel?.render(); });
     // Apply project and open first step
-    this.project = Object.assign({indicators:[]}, data);
+    this.project = Object.assign({indicators:[], flags:[], indicatorsVisible:true, flagsVisible:true}, data);
+    this.flags = new FlagsStore(this.project);
     this.indicators = new IndicatorsStore(this.project);
     this.indicatorsPanel?.render();
     this.currentStepPath = [];
@@ -210,7 +213,7 @@ _seedSample(){
       li.className='history-item' + (idx===cursor ? ' active' : '');
       const label = (cmd.label?cmd.label():cmd.constructor.name);
       li.innerHTML = '<div class="title"><span class="badge">'+(idx===cursor?'●':'○')+'</span><span>'+label+'</span></div>';
-      li.addEventListener('click', ()=>{ this.cmd.jumpTo(idx); this._captureState(); this.propertiesPanel.render(); this.stepsPanel.render(); this.stepsPanel.render(); });
+      li.addEventListener('click', ()=>{ this.cmd.jumpTo(idx); this._captureState(); this.propertiesPanel?.render(); this.stepsPanel.render(); this.stepsPanel.render(); });
       ul.appendChild(li);
     });
   }
@@ -311,7 +314,7 @@ _seedSample(){
       const Cls = registry.elements.get(e.type);
       if(Cls){ const el = Cls.fromJSON(e); el.name = this._makeName(el.constructor.type); this.stage.addElement(el); }
     }
-    this.propertiesPanel.render(); this.stepsPanel.render();
+    this.propertiesPanel?.render(); this.stepsPanel.render();
     this._loadingStep = false;
   }
 
@@ -332,7 +335,7 @@ _seedSample(){
     else{
       // clear stage
       [...this.stage.elements].forEach(e=> this.stage.removeElement(e));
-      this.propertiesPanel.render(); this.stepsPanel.render();
+      this.propertiesPanel?.render(); this.stepsPanel.render();
     this._loadingStep = false;
     }
   }

@@ -1,0 +1,20 @@
+{
+  "name": "medel-editor",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint js --ext .js",
+    "format": "prettier -w .",
+    "test:smoke": "node tests/smoke/run.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.11.1",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-n": "^17.10.2",
+    "eslint-plugin-promise": "^6.5.2",
+    "prettier": "^3.3.3",
+    "playwright": "^1.48.0"
+  }
+}

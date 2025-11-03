@@ -1,3 +1,4 @@
+import { applyTextStyleToAll } from '../utils/text-style.js';
 
 import { BaseElement } from './base-element.js';
 import { registry } from '../core/registry.js';
@@ -151,7 +152,10 @@ export class PairsElement extends BaseElement{
     const bg = this.getProp('bg'); if(bg) this.dom.style.background = bg;
     const br = this.getProp('border'); if(br) this.dom.style.border = br;
     this.dom.style.borderRadius='4px';
-  }
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}
   setProp(k,v,{silent=false}={}){
     super.setProp(k,v,{silent});
     if(k==='pairs'){

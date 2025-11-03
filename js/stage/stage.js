@@ -1,4 +1,6 @@
 
+import { applyStagePolicy } from '../policy/stage-policy.js';
+import CONFIG from '../config/app-config.js';
 import { $ } from '../utils/dom.js';
 import { EventBus } from '../core/eventbus.js';
 
@@ -25,6 +27,15 @@ export class Stage {
     this._setupMultiBox();
     this._bindPan();
     this._bindEvents();
+    // Block interactions when step locked
+    const blockIfLocked = (e)=>{ try{ if(this.el && this.el.dataset && this.el.dataset.locked==='1'){ e.preventDefault(); e.stopPropagation(); } }catch(_e){} };
+    this.el.addEventListener('beforeinput', blockIfLocked, true);
+    this.el.addEventListener('click', blockIfLocked, true);
+    this.el.addEventListener('pointerdown', blockIfLocked, true);
+    this.el.addEventListener('keydown', blockIfLocked, true);
+    // prevent interactions when step locked
+    this.el.addEventListener('beforeinput', (e)=>{ if(this.el && this.el.dataset && this.el.dataset.locked==='1'){ e.preventDefault(); e.stopPropagation(); } }, true);
+    this.el.addEventListener('click', (e)=>{ const t=e.target; if(this.el && this.el.dataset && this.el.dataset.locked==='1'){ if(t && (t.tagName==='INPUT'||t.tagName==='SELECT'||t.tagName==='TEXTAREA'||t.tagName==='BUTTON')){ e.preventDefault(); e.stopPropagation(); } } }, true);
     this.el.addEventListener('contextmenu', e=> e.preventDefault());
 
     this.updateGridCss();
@@ -182,3 +193,5 @@ export class Stage {
     window.addEventListener('mouseup', onUp);
   }
 }
+
+// NOTE: Call applyStagePolicy(this, this.bus) at the end of Stage constructor.

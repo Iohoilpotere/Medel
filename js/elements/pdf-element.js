@@ -3,27 +3,30 @@ import { registry } from '../core/registry.js';
 
 const DEFAULT_PDF = "https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf";
 
-
-
-
 // Lazy load pdf.js
 function ensurePdfJs(){
   return new Promise((resolve, reject)=>{
     if(window.pdfjsLib){ resolve(window.pdfjsLib); return; }
     const ver = "3.11.174";
-    const s = document.createElement('script');
-    s.src = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/build/pdf.min.js`;
-    s.async = true;
-    s.onload = ()=>{
-      try{
-        if(!window.pdfjsLib.GlobalWorkerOptions.workerSrc){
-          window.pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/build/pdf.worker.min.js`;
-        }
-        resolve(window.pdfjsLib);
-      }catch(e){ reject(e); }
+    const sources = [
+      `https://cdn.jsdelivr.net/npm/pdfjs-dist@${ver}/build/pdf.min.js`,
+      `https://unpkg.com/pdfjs-dist@${ver}/build/pdf.min.js`,
+      `./libs/pdfjs/pdf.min.js`
+    ];
+    let idx = 0;
+    const tryNext = ()=>{
+      if(idx >= sources.length){
+        reject(new Error('pdf.js load failed'));
+        return;
+      }
+      const src = sources[idx++];
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = ()=>{ if(window.pdfjsLib) resolve(window.pdfjsLib); else tryNext(); };
+      s.onerror = ()=>{ tryNext(); };
+      (document.head||document.body).appendChild(s);
     };
-    s.onerror = ()=> reject(new Error('Impossibile caricare pdf.js'));
-    document.head.appendChild(s);
+    tryNext();
   });
 }
 
@@ -82,11 +85,11 @@ export class PdfElement extends BaseElement{
   }
 
   resolveUrl(){
-  const raw = this.getProp('url') || DEFAULT_PDF;
-  const s = String(raw||'').trim();
-  if(!/^https?:\/\//i.test(s)) return '';
-  return s.split('#')[0];
-}
+    const raw = this.getProp('url') || DEFAULT_PDF;
+    const s = String(raw||'').trim();
+    if(!/^https?:\/\//i.test(s)) return '';
+    return s.split('#')[0];
+  }
 
   _mode(){ return (this.getProp('viewMode')||'page'); }
 
@@ -98,58 +101,57 @@ export class PdfElement extends BaseElement{
   }
 
   async _ensureDoc(url){
-  if(!url){ return null; }
-  try{
-    const myId = ++this._loadingId;
-    const pdfjsLib = await ensurePdfJs();
-    if(myId !== this._loadingId) return null;
-    if(this._doc){ try{ await this._doc.destroy(); }catch(_){ } this._doc=null; }
-    const task = pdfjsLib.getDocument({url});
-    const doc = await task.promise;
-    if(myId !== this._loadingId){ try{ await doc.destroy(); }catch(_){ } return null; }
-    this._doc = doc; this._pageCount = doc.numPages||1;
-    return doc;
-  }catch(e){
-    // fallback path: use iframe viewer
-    this._doc = null; this._pageCount = 9999; // unknown, will rely on user
-    this._renderFallback();
-    return null;
+    if(!url){ return null; }
+    try{
+      const myId = ++this._loadingId;
+      const pdfjsLib = await ensurePdfJs();
+      if(myId !== this._loadingId) return null;
+      if(this._doc){ try{ await this._doc.destroy(); }catch(_){ } this._doc=null; }
+      const task = pdfjsLib.getDocument({url});
+      const doc = await task.promise;
+      if(myId !== this._loadingId){ try{ await doc.destroy(); }catch(_){ } return null; }
+      this._doc = doc; this._pageCount = doc.numPages||1;
+      return doc;
+    }catch(e){
+      // fallback path: use iframe viewer
+      this._doc = null; this._pageCount = 9999; // unknown, will rely on user
+      this._renderFallback();
+      return null;
+    }
   }
-}
 
   _setError(on){
-  if(this.err) this.err.style.display = 'none'; // niente messaggio, solo grigio
-  if(on){
-    try{ if(this.canvas && this.canvas.parentNode) this.canvas.remove(); }catch(_){ }
-    try{ if(this.scroll && this.scroll.parentNode) this.scroll.remove(); }catch(_){ }
-    if(this.content) this.content.style.overflow='hidden';
-    if(this.dom) this.dom.style.background = '#e0e0e0';
-  }else{
-    const bg = this.getProp && (this.getProp('bg')||'#ffffff');
-    if(this.dom) this.dom.style.background = bg;
+    if(this.err) this.err.style.display = 'none'; // niente messaggio, solo grigio
+    if(on){
+      try{ if(this.canvas && this.canvas.parentNode) this.canvas.remove(); }catch(_){ }
+      try{ if(this.scroll && this.scroll.parentNode) this.scroll.remove(); }catch(_){ }
+      if(this.content) this.content.style.overflow='hidden';
+      if(this.dom) this.dom.style.background = '#e0e0e0';
+    }else{
+      const bg = this.getProp && (this.getProp('bg')||'#ffffff');
+      if(this.dom) this.dom.style.background = bg;
+    }
   }
-}
 
   async _render(){
     if(!this.content){ return; }
     const key = this._key();
-  if(key===this._lastKey) return; this._lastKey = key;
-  const url = this.resolveUrl();
-  // If we can render via pdf.js
-  let doc = this._doc;
-  if(!doc || (doc && doc._transport && doc._transport.params?.url !== url)){
-    doc = await this._ensureDoc(url);
+    if(key===this._lastKey) return; this._lastKey = key;
+    const url = this.resolveUrl();
+    // If we can render via pdf.js
+    let doc = this._doc;
+    if(!doc || (doc && doc._transport && doc._transport.params?.url !== url)){
+      doc = await this._ensureDoc(url);
+    }
+    if(!doc){ this._renderFallback(); return; }
+    const mode = this._mode();
+    if(mode==='free'){
+      await this._renderFree();
+    }else{
+      const pageNum = Math.max(1, Math.min(this._pageCount, parseInt(this.getProp('page'),10)||1));
+      await this._renderSingle(pageNum, mode==='page');
+    }
   }
-  if(!doc){ this._renderFallback(); return; }
-  const mode = this._mode();
-  if(mode==='free'){
-    await this._renderFree();
-  }else{
-    const pageNum = Math.max(1, Math.min(this._pageCount, parseInt(this.getProp('page'),10)||1));
-    await this._renderSingle(pageNum, mode==='page');
-  }
-}
-
 
   // fit-contain single page into element box and center (no stretch)
   async _renderSingle(pageNum, blockWheel){
@@ -192,7 +194,7 @@ export class PdfElement extends BaseElement{
     this._useScroll();
     // clear if URL changed (rebuild all)
     this.scroll.innerHTML='';
-    const z = this.stage?.zoom || 1;
+    const z = self?.stage?.zoom || this.stage?.zoom || 1;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
     const elW = this.w * z;
     for(let i=1;i<=this._pageCount;i++){

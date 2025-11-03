@@ -1,5 +1,7 @@
 import { registry } from '../core/registry.js';
 import { BaseElement } from './base-element.js';
+import { applyTextStyleToAll } from '../utils/text-style.js';
+import { applyItemsAlign } from '../utils/apply-items-align.js';
 
 export class RadioGroupElement extends BaseElement{
   constructor(opts={}){
@@ -27,6 +29,9 @@ export class RadioGroupElement extends BaseElement{
     if(!this.content) return;
     this.content.innerHTML='';
     const wrap = document.createElement('div');
+    // auto: unified items align
+    try{ applyItemsAlign(wrap, this); }catch(_e){}
+
     // Likert mode: render as range slider with labels
     if((this.getProp('selectionStyle')||'standard')==='likert'){
       wrap.style.display='flex'; wrap.style.flexDirection='column';
@@ -448,7 +453,10 @@ export class RadioGroupElement extends BaseElement{
       const shCol = ov.shadowColor ?? baseSh; const dx = Number(ov.shadowDx ?? baseDx); const dy = Number(ov.shadowDy ?? baseDy); const blur = Number(ov.shadowBlur ?? baseBlur);
       lbl.style.textShadow = shOn ? `${dx}px ${dy}px ${blur}px ${shCol}` : '';
     });
-  }
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}
 }
 RadioGroupElement.type = 'radiogroup';
 registry.registerElement(RadioGroupElement.type, RadioGroupElement);

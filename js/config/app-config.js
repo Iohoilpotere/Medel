@@ -1,0 +1,12 @@
+// Central configuration for Medel (ESM)
+const CONFIG = Object.freeze({
+  STORAGE_NAMESPACE: 'MEDEL/SESSION/v1',
+  UNLOCK_DEFAULT_MODE: 'viewPrev',
+  UNLOCK_INDICATOR_THRESHOLD_DEFAULT: 0,
+  INPUT_DEBOUNCE_MS: 120,
+  DETAIL_SYNC_DELAY_MS: 60,
+  UI_DEFAULT_COLOR_TEXT: '#0e0e0e',
+  UI_HOVER_OPACITY: 0.85
+});
+
+export default CONFIG;

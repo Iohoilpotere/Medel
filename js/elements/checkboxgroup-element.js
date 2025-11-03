@@ -1,9 +1,12 @@
 import { registry } from '../core/registry.js';
 import { BaseElement } from './base-element.js';
+import { applyTextStyleToAll } from '../utils/text-style.js';
+import { applyItemsAlign } from '../utils/apply-items-align.js';
 
 export class CheckboxGroupElement extends BaseElement{
   constructor(opts={}){
     super(opts);
+    this._lockedValues = new Set();
     this.setProp('fontFamily', opts.fontFamily ?? 'System');
     this.setProp('fontWeight', Number.isFinite(opts.fontWeight)? opts.fontWeight : 400);
     this.setProp('italic', !!opts.italic);
@@ -27,6 +30,15 @@ export class CheckboxGroupElement extends BaseElement{
     if(!this.content) return;
     this.content.innerHTML='';
     const wrap = document.createElement('div');
+    
+    // capture locked values on confirm
+    try{
+      const __bus = this.stage && this.stage.bus;
+      if(__bus){ __bus.on('step-confirmed', ()=>{ if(!!this.getProp('lockOnSelect')){ this._lockedValues = new Set(this.getProp('values')||[]); } }); }
+    }catch(_e){}
+// auto: unified items align
+    try{ applyItemsAlign(wrap, this); }catch(_e){}
+
     // Pills style rendering
     if((this.getProp('selectionStyle')||'standard')==='pills'){
       wrap.style.display='flex'; wrap.style.flexWrap='wrap';
@@ -43,7 +55,37 @@ export class CheckboxGroupElement extends BaseElement{
       }
       const items = this.getProp('items') || [];
       const valuesSet = new Set(this.getProp('values') || []);
+      const bus = this.stage && this.stage.bus;
+      const applyLockToInputs = (confirmed)=>{
+        const curVals = new Set(this.getProp('values')||[]);
+        wrap.querySelectorAll('input[type=checkbox]').forEach((inp, j)=>{
+          const isOn = curVals.has(j);
+          if(inp.dataset){
+            if(!!this.getProp('lockOnSelect')) inp.dataset.locked = (confirmed && isOn) ? '1':'0'; else inp.dataset.locked='0';
+          }
+        });
+      };
+      if(bus){ bus.on('step-state', (st)=> applyLockToInputs(!!(st && st.confirmed))); bus.on('step-confirmed', ()=> applyLockToInputs(true)); }
       items.forEach((txt,i)=>{
+        const bus = this.stage && this.stage.bus;
+        const applyLockToButtons = (confirmed)=>{
+          const curVals = new Set(this.getProp('values')||[]);
+          wrap.querySelectorAll('button.step-item, button').forEach((btn, j)=>{
+            const isOn = curVals.has(j);
+            if(btn.dataset){
+              if(!!this.getProp('lockOnSelect')){
+                btn.dataset.locked = (confirmed && isOn) ? '1':'0';
+              }else{
+                btn.dataset.locked = '0';
+              }
+            }
+          });
+        };
+        if(bus){
+          bus.on('step-state', (st)=> applyLockToButtons(!!(st && st.confirmed)));
+          bus.on('step-confirmed', ()=> applyLockToButtons(true));
+        }
+        
         const b=document.createElement('button'); b.type='button'; b.textContent=String(txt);
         const on = valuesSet.has(i);
         const ov = (this.getProp('itemStyles')||{})[i] || {};
@@ -84,10 +126,12 @@ export class CheckboxGroupElement extends BaseElement{
           const set=new Set(this.getProp('values')||[]);
           const _lockOn=!!this.getProp('lockOnSelect');
           const isOn=set.has(i);
-          if(_lockOn && isOn){ return; }
+          if(_lockOn && b && b.dataset && b.dataset.locked==='1' && isOn){ return; }
           if(isOn) set.delete(i); else set.add(i);
           this.setProp('values', Array.from(set), {silent:true});
-          // re-render
+                    // keep locked selections
+          if(this._lockedValues){ this._lockedValues.forEach(v=>set.add(v)); this.setProp('values', Array.from(set), {silent:true}); }
+// re-render
           this.updateDom();
         });
         const shCol=this.getProp('pillShadowColor')||''; const sdx=Number(this.getProp('pillShadowDx')||0); const sdy=Number(this.getProp('pillShadowDy')||0); const sblur=Number(this.getProp('pillShadowBlur')||0);
@@ -178,20 +222,49 @@ export class CheckboxGroupElement extends BaseElement{
     wrap.style.display='flex'; wrap.style.flexDirection='column'; const __zoom=(this.stage&&this.stage.zoom)?this.stage.zoom:1; wrap.style.gap=String(6*__zoom)+'px';
     const items = this.getProp('items') || [];
     const valuesSet = new Set(this.getProp('values') || []);
+      const bus = this.stage && this.stage.bus;
+      const applyLockToInputs = (confirmed)=>{
+        const curVals = new Set(this.getProp('values')||[]);
+        wrap.querySelectorAll('input[type=checkbox]').forEach((inp, j)=>{
+          const isOn = curVals.has(j);
+          if(inp.dataset){
+            if(!!this.getProp('lockOnSelect')) inp.dataset.locked = (confirmed && isOn) ? '1':'0'; else inp.dataset.locked='0';
+          }
+        });
+      };
+      if(bus){ bus.on('step-state', (st)=> applyLockToInputs(!!(st && st.confirmed))); bus.on('step-confirmed', ()=> applyLockToInputs(true)); }
     items.forEach((txt,i)=>{
+        const bus = this.stage && this.stage.bus;
+        const applyLockToButtons = (confirmed)=>{
+          const curVals = new Set(this.getProp('values')||[]);
+          wrap.querySelectorAll('button.step-item, button').forEach((btn, j)=>{
+            const isOn = curVals.has(j);
+            if(btn.dataset){
+              if(!!this.getProp('lockOnSelect')){
+                btn.dataset.locked = (confirmed && isOn) ? '1':'0';
+              }else{
+                btn.dataset.locked = '0';
+              }
+            }
+          });
+        };
+        if(bus){
+          bus.on('step-state', (st)=> applyLockToButtons(!!(st && st.confirmed)));
+          bus.on('step-confirmed', ()=> applyLockToButtons(true));
+        }
+        
       const lab = document.createElement('label'); lab.style.display='block'; lab.style.width='100%'; lab.style.boxSizing='border-box'; lab.style.whiteSpace='nowrap';
       const input = document.createElement('input');
       input.type='checkbox';
       input.checked = valuesSet.has(i);
+      input.addEventListener('mousedown', (e)=>{ if(input.dataset && input.dataset.locked==='1' && input.checked){ e.preventDefault(); e.stopPropagation(); } }, true);
       input.addEventListener('change', ()=>{
-        const _lockOn=!!this.getProp('lockOnSelect');
-        if(_lockOn){
-          if(!input.checked && input.dataset.locked==='1'){ input.checked=true; return; }
-          if(input.checked){ input.dataset.locked='1'; }
-        }
+        if(!input.checked && input.dataset && input.dataset.locked==='1'){ input.checked=true; return; }
         if(input.checked) valuesSet.add(i); else valuesSet.delete(i);
         this.setProp('values', Array.from(valuesSet), {silent:true});
-      });
+              // keep locked selections
+        if(this._lockedValues){ this._lockedValues.forEach(v=>valuesSet.add(v)); this.setProp('values', Array.from(valuesSet), {silent:true}); }
+});
       lab.appendChild(input);
       lab.append(' '+String(txt));
       wrap.appendChild(lab);
@@ -284,7 +357,10 @@ export class CheckboxGroupElement extends BaseElement{
       const shCol = ov.shadowColor ?? baseSh; const dx = Number(ov.shadowDx ?? baseDx); const dy = Number(ov.shadowDy ?? baseDy); const blur = Number(ov.shadowBlur ?? baseBlur);
       lbl.style.textShadow = shOn ? `${dx}px ${dy}px ${blur}px ${shCol}` : '';
     });
-  }
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}
 }
 CheckboxGroupElement.type = 'checkboxgroup';
 registry.registerElement(CheckboxGroupElement.type, CheckboxGroupElement);

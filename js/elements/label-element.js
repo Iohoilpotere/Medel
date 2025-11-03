@@ -1,3 +1,4 @@
+import { applyTextStyleToAll } from '../utils/text-style.js';
 
 import { registry } from '../core/registry.js';
 import { BaseElement } from './base-element.js';
@@ -97,7 +98,10 @@ export class LabelElement extends BaseElement{
     // apply stroke style after DOM is built
     this.applyStrokeStyle();
 
-  }
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}
 
   applyStrokeStyle(){
     const span = this.content.querySelector('span');

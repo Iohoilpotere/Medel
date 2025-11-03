@@ -14,7 +14,7 @@ export class AlignmentProperty extends BaseProperty{
     const rowH=document.createElement('div'); rowH.className='prop-row';
     const labH=document.createElement('label'); labH.textContent='Orizzontale'; rowH.appendChild(labH);
     const selH=document.createElement('select');
-    ['left','center','right','justify'].forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; if((targets[0].getProp('alignH')||'left')===o) opt.selected=true; selH.appendChild(opt); });
+    ['left','center','right'].forEach(o=>{ const opt=document.createElement('option'); opt.value=o; opt.textContent=o; if((targets[0].getProp('alignH')||'left')===o) opt.selected=true; selH.appendChild(opt); });
     selH.addEventListener('change', ()=> targets.forEach(t=> t.setProp('alignH', selH.value)));
     rowH.appendChild(selH); wrap.appendChild(rowH);
     const rowV=document.createElement('div'); rowV.className='prop-row';

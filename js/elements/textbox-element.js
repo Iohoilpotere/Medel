@@ -1,3 +1,4 @@
+import { applyTextStyleToAll } from '../utils/text-style.js';
 
 import { registry } from '../core/registry.js';
 import { BaseElement } from './base-element.js';
@@ -51,7 +52,10 @@ export class TextBoxElement extends BaseElement{
     
     input.style.width='100%'; input.style.height='100%';
     this.content.appendChild(input);
-  }
+  
+    // auto: apply text style to labels/spans
+    if(this.content){ try{ applyTextStyleToAll(this.content, this); }catch(_e){} }
+}
 }
 TextBoxElement.type = 'textbox';
 registry.registerElement(TextBoxElement.type, TextBoxElement);

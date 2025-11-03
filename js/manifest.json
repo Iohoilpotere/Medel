@@ -11,6 +11,7 @@
     "/js/elements/tablecheck-element.js"
   ],
   "properties": [
+    "/js/properties/name-id.js",
     "/js/properties/alignment.js",
     "/js/properties/background-border.js",
     "/js/properties/color.js",

@@ -24,9 +24,13 @@
       <div class="indicators" id="indicatorsBar"></div>
       <div class="canvasHost"><div id="viewerStage" class="stageWrap"></div></div>
       <div class="footer">
-        <button class="btn" id="nextBtn">Avanti</button>
+        <div class="buttons" style="display:flex; gap:10px; margin-left:auto;">
+          <button id="btnConfirm" class="btn" style="display:none">Conferma</button>
+          <button id="btnNext" class="btn">Avanti</button>
+        </div>
       </div>
-    </main>
+    
+</main>
   </div>
   <script type="module" src="./viewer.js"></script>
 
@@ -53,5 +57,45 @@
   }
 })();
 </script>
+
+<!-- PATCH: toggle-all checkboxes and trigger change after load -->
+<script>
+(function(){
+  function fire(el){
+    try{ el.dispatchEvent(new Event('input', {bubbles:true})); }catch(e){}
+    try{ el.dispatchEvent(new Event('change', {bubbles:true})); }catch(e){}
+  }
+  function kick(root){
+    if(!root) return;
+    root.querySelectorAll('input[type=checkbox],input[type=radio]').forEach(fire);
+  }
+  window.addEventListener('load', function(){
+    const stage = document.getElementById('viewerStage') || document;
+    setTimeout(()=>kick(stage), 0);
+    setTimeout(()=>kick(stage), 60);
+    setTimeout(()=>kick(stage), 120);
+  });
+
+  // Add a small toggle-all button for debug (left of Confirm/Next)
+  try{
+    const footerBtns = document.querySelector('.footer .buttons');
+    if(footerBtns){
+      const toggler = document.createElement('button');
+      toggler.id = 'btnToggleAllCheckboxes';
+      toggler.className = 'btn';
+      toggler.textContent = 'Toggle tutte le checkbox';
+      toggler.addEventListener('click', ()=>{
+        const root = document.getElementById('viewerStage') || document;
+        const boxes = root.querySelectorAll('input[type=checkbox]');
+        const anyUnchecked = Array.from(boxes).some(b=>!b.checked);
+        boxes.forEach(b=>{ b.checked = anyUnchecked; fire(b); });
+        try{ console.debug('[PATCH][toggle-all]', boxes.length, 'set to', anyUnchecked);}catch(e){}
+      });
+      footerBtns.insertBefore(toggler, footerBtns.firstChild);
+    }
+  }catch(e){}
+})();
+</script>
+
 </body>
 </html>
