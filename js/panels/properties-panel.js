@@ -74,12 +74,16 @@ export class PropertiesPanel{
     (function(){
       const r=document.createElement('div'); r.className='prop-row';
       const l=document.createElement('label'); l.textContent='Valore di default'; r.appendChild(l);
-      const i=document.createElement('input'); i.type='number'; i.step='any'; i.value = (ind.value!=null? ind.value : '');
+      const i=document.createElement('input'); i.type='number'; i.step='any';
+      // default UI value: always show a number, fallback to 0
+      i.value = (ind.value !== undefined && ind.value !== null && !Number.isNaN(Number(ind.value)))
+        ? String(ind.value)
+        : '0';
       i.addEventListener('input', ()=>{
         const nv = i.value.trim();
-        const num = nv==='' ? null : Number(nv);
+        const num = nv === '' ? 0 : Number(nv);
         const store = this.app && this.app.indicators;
-        store && store.update(ind.id, { value: (num===null || Number.isNaN(num)) ? null : num });
+        store && store.update(ind.id, { value: Number.isNaN(num) ? 0 : num });
       });
       r.appendChild(i); content.appendChild(r);
     }).call(this);

@@ -65,6 +65,7 @@
           <button data-tab="elements" class="active">Elementi</button>
           <button data-tab="indicators">Indicatori</button>
           <button data-tab="steps">Step</button>
+          <button data-tab="presets">Presets</button>
         </div>
         <div class="pane bodies">
           <section id="elementsPane" class="pane-body active">
@@ -100,6 +101,10 @@
             </div>
             <ul id="stepsList" class="steps"></ul>
           </section>
+          <section id="presetsPane" class="pane-body">
+            <!-- Will be rendered by PresetsPanel -->
+          </section>
+    
         </div>
       </aside>
       <section class="stage-wrap">
@@ -110,6 +115,7 @@
         <div class="tabstrip" id="rightTabs">
           <button data-tab="props" class="active">Proprietà</button>
           <button data-tab="history">Storia</button>
+          <button data-tab="interactivity">Interattività</button>
         </div>
         <div class="pane bodies">
           <section id="propsPane" class="pane-body active">
@@ -118,7 +124,11 @@
           <section id="historyPane" class="pane-body">
             <ul id="historyList" class="steps"></ul>
           </section>
+          <section id="interactivityPane" class="pane-body">
+            <form id="interactivityForm" class="prop-form"></form>
+          </section>
         </div>
+            
       </aside>
     </div>
   </div>

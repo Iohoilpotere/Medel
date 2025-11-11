@@ -1,14 +1,14 @@
 
-// New computeUnlockedCount using Strategy
-function computeUnlockedCount(flatSteps, state, project){
-  return computeUnlockedCountWithStrategy(flatSteps, state, project, createUnlockStrategy);
-}
-
 import { computeUnlockedCountWithStrategy, createUnlockStrategy } from './js/strategies/unlock-strategies.js';
 import { saveSession, applySession } from './js/persistence/session-store.js';
 import CONFIG from './js/config/app-config.js';
 import { registry, loadModules } from './js/core/registry.js';
 import { Stage } from './js/stage/stage.js';
+
+// New computeUnlockedCount using Strategy
+function computeUnlockedCount(flatSteps, state, project){
+  return computeUnlockedCountWithStrategy(flatSteps, state, project, createUnlockStrategy);
+}
 const qs = (k) => new URLSearchParams(location.search).get(k);
 
 // Minimal global updater for viewer buttons (labels + visibility + disabled)
@@ -254,22 +254,59 @@ async function main(){
       else { try{ showResults(); }catch(e){} }
     });
   }
+  
   if(confirmBtn){
     confirmBtn.addEventListener('click', ()=>{
+      const effectiveStage = (curStage || stage);
+
+      // Persist current step selections for MedelPersistence v5
+      try{
+        if(typeof MedelPersistence !== 'undefined' &&
+           MedelPersistence &&
+           typeof MedelPersistence.saveOnConfirm === 'function'){
+          MedelPersistence.saveOnConfirm(project, idx, effectiveStage);
+        }
+      }catch(e){
+        try{ console.error('[MEDEL][PERSIST][v5] saveOnConfirm error', e); }catch(_e){}
+      }
+
       confirmedForStep = true;
-            // MEDEL PERSIST v3: save values for this step
-      try{ MedelPersistence && MedelPersistence.saveOnConfirm && MedelPersistence.saveOnConfirm(project, idx, (curStage || stage)); }catch(e){ console.error('[MEDEL][PERSIST][v3] save error', e); }
-state.stepsState[idx] = Object.assign({}, state.stepsState[idx], { confirmed:true });
-      try{ (curStage?.bus||stage.bus).emit('step-confirmed', { index: idx }); }catch(_e){}
-      // lock whole step if configured
+      state.stepsState[idx] = Object.assign({}, state.stepsState[idx], { confirmed:true });
+
+      // Recompute indicators & flags based on ALL steps (last-write-wins for flags)
+      try{
+        applyInteractivityOnConfirm(project, effectiveStage);
+      }catch(e){
+        try{ console.error('[MEDEL][INTERACTIVITY] applyOnConfirm error', e); }catch(_e){}
+      }
+
+      // Notify listeners
+      try{
+        (curStage?.bus || stage.bus).emit('step-confirmed', { index: idx });
+      }catch(_e){}
+
+      // Optionally lock step contents
       try{
         const stp = flatSteps[idx].step || {};
-        if(stp.lockOnConfirmStep && curStage && curStage.el){ curStage.el.dataset.locked='1'; (curStage.bus||stage.bus).emit('step-locked', { index: idx }); }
+        if(stp.lockOnConfirmStep && effectiveStage && effectiveStage.el){
+          effectiveStage.el.dataset.locked = '1';
+          (effectiveStage.bus || stage.bus).emit('step-locked', { index: idx });
+        }
       }catch(_e){}
+
       if(nextBtn) nextBtn.disabled = false;
-      renderStepsList(list, project, idx, (i)=>{ idx=i; refresh(); }, computeUnlockedCount(flatSteps, state, project));
+
+      // Refresh sidebar unlock state based on updated indicators/flags
+      renderStepsList(
+        list,
+        project,
+        idx,
+        (i)=>{ idx = i; refresh(); },
+        computeUnlockedCount(flatSteps, state, project)
+      );
     });
   }
+
 
 
 
@@ -315,18 +352,336 @@ state.stepsState[idx] = Object.assign({}, state.stepsState[idx], { viewed:true }
     if(window.ResizeObserver){ const ro2=new ResizeObserver(()=>fitStageWidth(s2, canvasHost)); ro2.observe(canvasHost);}
     renderStepsList(list, project, idx, (i)=>{ idx=i; refresh(); }, computeUnlockedCount(flatSteps, state, project));
   }
+  
   function showResults(){
-    const overlay = el('div');
-    overlay.style.position='fixed'; overlay.style.inset='0'; overlay.style.background='rgba(0,0,0,0.6)'; overlay.style.backdropFilter='blur(2px)'; overlay.style.display='flex'; overlay.style.alignItems='center'; overlay.style.justifyContent='center';
-    const card = el('div');
-    card.style.background='#111'; card.style.border='1px solid rgba(255,255,255,.15)'; card.style.borderRadius='12px'; card.style.padding='16px'; card.style.width='min(900px,92vw)'; card.style.maxHeight='80vh'; card.style.overflow='auto';
-    const h = el('h2'); h.textContent='Risultati'; h.style.margin='0 0 12px 0';
-    const ul = el('ul'); ul.style.listStyle='none'; ul.style.padding='0';
-    (project.steps||[]).forEach((st,i)=>{ const li=el('li'); li.style.padding='8px 0'; li.textContent = `Step ${i+1}: ${st.title||''}`; ul.appendChild(li); });
-    const close = el('button'); close.textContent='Chiudi'; close.className='btn'; close.style.marginTop='12px';
-    close.addEventListener('click', ()=> overlay.remove());
-    card.appendChild(h); card.appendChild(ul); card.appendChild(close);
-    overlay.appendChild(card); document.body.appendChild(overlay);
+    try{
+      const canvasHost = document.getElementById('viewerStage');
+      if(!canvasHost){ return; }
+
+      // Prova a salvare lo stato corrente dell'ultimo step (anche se non confermato)
+      try{
+        if(typeof MedelPersistence !== 'undefined' &&
+           MedelPersistence &&
+           typeof MedelPersistence.saveOnConfirm === 'function' &&
+           curStage){
+          MedelPersistence.saveOnConfirm(project, idx, curStage);
+        }
+      }catch(e){
+        try{ console.error('[MEDEL][SUMMARY] saveOnConfirm before summary failed', e); }catch(_e){}
+      }
+
+      const store = (typeof MedelPersistence !== 'undefined' &&
+                     MedelPersistence &&
+                     typeof MedelPersistence._load === 'function')
+        ? (MedelPersistence._load(project) || { steps: {} })
+        : { steps: {} };
+
+      const labelsById = buildLabelMap(project);
+      const { list } = buildFlatSteps(project);
+      let stepIndex = -1;
+      const items = [];
+
+      list.forEach(node => {
+        if(!node.step){ return; }
+        stepIndex += 1;
+        const step = node.step;
+        const stepKey = String(stepIndex);
+        const saved = (store.steps && store.steps[stepKey]) || {};
+        const elValues = saved.elements || {};
+        const elements = Array.isArray(step.elements) ? step.elements : [];
+
+        elements.forEach(elDef => {
+          if(!elDef || !elDef.type){ return; }
+          const t = String(elDef.type);
+          if(t !== 'checkbox' && t !== 'checkboxgroup' && t !== 'radiogroup' && t !== 'tablecheck'){
+            return;
+          }
+          const summary = buildSummaryItemForElement(project, labelsById, elDef, elValues);
+          if(summary && Array.isArray(summary.options) && summary.options.length){
+            items.push(summary);
+          }
+        });
+      });
+
+      // Nascondi eventuale stage corrente
+      if(curStage && curStage.el){
+        curStage.el.style.display = 'none';
+      }
+
+      // Rimuovi eventuale riepilogo precedente
+      const old = document.getElementById('medelSummarySlide');
+      if(old && old.parentNode){
+        old.parentNode.removeChild(old);
+      }
+
+      const wrap = document.createElement('div');
+      wrap.id = 'medelSummarySlide';
+      wrap.style.position = 'absolute';
+      wrap.style.inset = '0';
+      wrap.style.display = 'flex';
+      wrap.style.flexDirection = 'column';
+      wrap.style.padding = '18px 18px 14px';
+      wrap.style.boxSizing = 'border-box';
+      wrap.style.background = 'radial-gradient(circle at top left, rgba(62,108,255,0.16), transparent), radial-gradient(circle at bottom right, rgba(45,212,191,0.10), #020817)';
+      wrap.style.color = '#f9fafb';
+      wrap.style.overflow = 'hidden';
+      wrap.style.gap = '12px';
+
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.justifyContent = 'space-between';
+      header.style.alignItems = 'baseline';
+      header.style.gap = '12px';
+
+      const title = document.createElement('h1');
+      title.textContent = (project && project.title) ? String(project.title) : 'Riepilogo risposte';
+      title.style.fontSize = '20px';
+      title.style.margin = '0';
+      title.style.fontWeight = '600';
+
+      const subtitle = document.createElement('div');
+      subtitle.textContent = 'Panoramica delle scelte effettuate nel caso clinico';
+      subtitle.style.opacity = '0.75';
+      subtitle.style.fontSize = '11px';
+
+      header.appendChild(title);
+      header.appendChild(subtitle);
+      wrap.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.style.flex = '1 1 auto';
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(260px, 1fr))';
+      grid.style.gap = '10px';
+      grid.style.alignItems = 'flex-start';
+      grid.style.paddingRight = '4px';
+      grid.style.paddingBottom = '4px';
+      grid.style.overflowY = 'auto';
+
+      if(!items.length){
+        const empty = document.createElement('div');
+        empty.textContent = 'Nessuna risposta registrata.';
+        empty.style.fontSize = '13px';
+        empty.style.opacity = '0.8';
+        empty.style.marginTop = '8px';
+        wrap.appendChild(empty);
+      }else{
+        items.forEach(function(item){
+          const card = document.createElement('div');
+          card.style.background = 'rgba(10,12,19,0.98)';
+          card.style.borderRadius = '12px';
+          card.style.border = '1px solid rgba(148,163,253,0.18)';
+          card.style.padding = '10px 9px 8px';
+          card.style.display = 'flex';
+          card.style.flexDirection = 'column';
+          card.style.gap = '4px';
+          card.style.boxShadow = '0 10px 30px rgba(15,23,42,0.55)';
+
+          const q = document.createElement('div');
+          q.textContent = item.title;
+          q.style.fontSize = '12px';
+          q.style.fontWeight = '600';
+          q.style.margin = '0 0 2px 0';
+          q.style.color = '#e5e7eb';
+
+          const meta = document.createElement('div');
+          meta.textContent = item.meta || '';
+          meta.style.fontSize = '9px';
+          meta.style.opacity = '0.55';
+
+          const list = document.createElement('div');
+          list.style.display = 'flex';
+          list.style.flexWrap = 'wrap';
+          list.style.gap = '3px';
+
+          item.options.forEach(function(opt){
+            const tag = document.createElement('div');
+            tag.textContent = opt.label;
+            tag.style.fontSize = '10px';
+            tag.style.padding = '3px 6px 3px';
+            tag.style.borderRadius = '999px';
+            tag.style.border = '1px solid rgba(148,163,253,0.25)';
+            tag.style.whiteSpace = 'nowrap';
+            tag.style.maxWidth = '100%';
+            tag.style.overflow = 'hidden';
+            tag.style.textOverflow = 'ellipsis';
+
+            if(opt.selected){
+              tag.style.background = 'rgba(79,70,229,0.26)';
+              tag.style.color = '#e5e7eb';
+              tag.style.borderColor = 'rgba(129,140,248,0.9)';
+              tag.style.fontWeight = '600';
+            }else{
+              tag.style.background = 'rgba(15,23,42,0.9)';
+              tag.style.color = '#9ca3af';
+              tag.style.opacity = '0.45';
+            }
+
+            list.appendChild(tag);
+          });
+
+          card.appendChild(q);
+          if(item.meta){ card.appendChild(meta); }
+          card.appendChild(list);
+          grid.appendChild(card);
+        });
+        wrap.appendChild(grid);
+      }
+
+      canvasHost.appendChild(wrap);
+
+      // Disattiva i pulsanti di navigazione nel riepilogo finale
+      try{
+        const nextBtn = document.getElementById('btnNext');
+        const confirmBtn = document.getElementById('btnConfirm');
+        if(nextBtn){ nextBtn.disabled = true; nextBtn.classList.add('disabled'); }
+        if(confirmBtn){ confirmBtn.style.display = 'none'; }
+      }catch(ignore){}
+    }catch(e){
+      try{ console.error('[MEDEL][SUMMARY] render error', e); }catch(ignore2){}
+    }
+
+    // Helpers locali al riepilogo
+
+    function buildLabelMap(project){
+      const out = {};
+      if(!project || !Array.isArray(project.steps)){ return out; }
+
+      function walk(nodes){
+        nodes.forEach(function(node){
+          if(!node){ return; }
+          if(node.type === 'step'){
+            const els = Array.isArray(node.elements) ? node.elements : [];
+            els.forEach(function(ed){
+              if(ed && ed.type === 'label'){
+                const id = (ed.id) ||
+                           (ed.props && (ed.props.id || ed.props.name)) ||
+                           '';
+                const text = (ed.props && (ed.props.text || ed.props.label)) || '';
+                if(id && text && !out[id]){
+                  out[id] = String(text);
+                }
+              }
+            });
+          }else if(node.type === 'category' && Array.isArray(node.children)){
+            walk(node.children);
+          }
+        });
+      }
+
+      walk(project.steps);
+      return out;
+    }
+
+    function resolveQuestionTitle(project, labelsById, elDef){
+      const props = (elDef && elDef.props) ? elDef.props : {};
+      const inter = props.interactivity || {};
+      const q = inter.question || {};
+
+      if(q.mode === 'manual' && typeof q.text === 'string' && q.text.trim()){
+        return q.text.trim();
+      }
+      if(q.mode === 'label' && q.labelId && labelsById[q.labelId]){
+        return labelsById[q.labelId];
+      }
+      if(q.labelId && labelsById[q.labelId]){
+        return labelsById[q.labelId];
+      }
+
+      if(typeof props.label === 'string' && props.label.trim()){
+        return props.label.trim();
+      }
+      if(typeof props.text === 'string' && props.text.trim()){
+        return props.text.trim();
+      }
+      if(typeof props.placeholder === 'string' && props.placeholder.trim()){
+        return props.placeholder.trim();
+      }
+
+      const base = elDef.type ? String(elDef.type) : 'Elemento';
+      const id = (elDef.id) || (props.id) || '';
+      return id ? (base + ' (' + id + ')') : base;
+    }
+
+    function buildSummaryItemForElement(project, labelsById, elDef, elValues){
+      const type = String(elDef.type);
+      const props = elDef.props || {};
+      const id = (elDef.id) ||
+                 (props.id) ||
+                 (props.name) ||
+                 '';
+      if(!id){ return null; }
+
+      const title = resolveQuestionTitle(project, labelsById, elDef);
+      const meta = (type === 'checkboxgroup')
+        ? 'Risposta multipla'
+        : (type === 'radiogroup')
+          ? 'Risposta singola'
+          : (type === 'tablecheck')
+            ? 'Selezione tabellare'
+            : 'Checkbox';
+
+      if(type === 'checkbox'){
+        const key = 'chk:' + id;
+        const entry = elValues[key];
+        const selected = !!(entry && entry.t === 'checkbox' && entry.v);
+        const label = (props.text && String(props.text)) || title || 'Selezionato';
+        return {
+          type: type,
+          title: title,
+          meta: meta,
+          options: [
+            { label: label, selected: selected }
+          ]
+        };
+      }
+
+      if(type === 'checkboxgroup'){
+        const key = 'cg:' + id;
+        const entry = elValues[key];
+        const srcItems = Array.isArray(props.items) ? props.items : [];
+        const values = (entry && entry.t === 'checkboxgroup' && Array.isArray(entry.v)) ? entry.v : [];
+        const options = srcItems.map(function(lbl, i){
+          return {
+            label: String(lbl),
+            selected: !!values[i]
+          };
+        });
+        return { type: type, title: title, meta: meta, options: options };
+      }
+
+      if(type === 'radiogroup'){
+        const key = 'rg:' + id;
+        const entry = elValues[key];
+        const srcItems = Array.isArray(props.items) ? props.items : [];
+        const selIndex = (entry && entry.t === 'radiogroup' && typeof entry.v === 'number') ? entry.v : -1;
+        const options = srcItems.map(function(lbl, i){
+          return {
+            label: String(lbl),
+            selected: (i === selIndex)
+          };
+        });
+        return { type: type, title: title, meta: meta, options: options };
+      }
+
+      if(type === 'tablecheck'){
+        const key = 'tbl:' + id;
+        const entry = elValues[key];
+        const items = Array.isArray(props.items) ? props.items : [];
+        const rowsContent = props.rowsContent || {};
+        const flags = (entry && entry.t === 'tablecheck' && Array.isArray(entry.v)) ? entry.v : [];
+        const options = items.map(function(k, i){
+          var rawLabel = (rowsContent && rowsContent[k]) ? rowsContent[k] : k;
+          return {
+            label: String(rawLabel),
+            selected: !!flags[i]
+          };
+        });
+        return { type: type, title: title, meta: meta, options: options };
+      }
+
+      return null;
+    }
   }
 
   setStageStep(stage, flatSteps?.[idx]?.step || {elements:[]});
@@ -345,6 +700,265 @@ main().catch(err=>{
 });
 
 
+
+
+// === Interactivity apply on Confirm ===
+
+/**
+ * Apply interactivity rules at CONFIRM, recomputing indicators and flags
+ * from scratch based on ALL saved user choices.
+ *
+ * Rules:
+ * - Each Indicator starts from its project default value (or 0 if invalid).
+ * - Each Flag starts from its project default (or false).
+ * - For every step in order, for every element with interactivity:
+ *     - checkbox: if checked -> apply its checkbox.actions.
+ *     - checkboxgroup: for each checked index -> apply options[index].
+ *     - radiogroup: for selected index -> apply options[index].
+ *     - tablecheck: for each checked cell -> apply options[index].
+ * - Indicator actions sum their delta (base + sum of all deltas).
+ * - Flag actions are last-write-wins: the last step that sets it wins,
+ *   even if the user later changes previous steps.
+ *
+ * This function expects that MedelPersistence.saveOnConfirm has already
+ * persisted the current step before being called.
+ */
+function applyInteractivityOnConfirm(project, currentStage){
+  if(!project) return;
+
+  const hasPersistence =
+    typeof MedelPersistence !== 'undefined' &&
+    MedelPersistence &&
+    typeof MedelPersistence._load === 'function';
+
+  // If we don't have the v5 persistence, gracefully fall back to legacy
+  // behaviour limited to the current stage.
+  if(!hasPersistence){
+    if(currentStage && Array.isArray(currentStage.elements)){
+      const indicators = Array.isArray(project.indicators) ? project.indicators : [];
+      const flags = Array.isArray(project.flags) ? project.flags : [];
+      const byId = (arr,id)=> arr.find(x=> x.id===id);
+      const applyActions = (actions)=>{
+        (actions||[]).forEach(a=>{
+          if(!a || !a.id) return;
+          if(a.type === 'indicator'){
+            const ind = byId(indicators, a.id);
+            if(ind){
+              const cur = (typeof ind.value === 'number') ? ind.value : 0;
+              const delta = Number(a.delta || 0);
+              ind.value = cur + delta;
+            }
+          }else if(a.type === 'flag'){
+            const f = byId(flags, a.id);
+            if(f){ f.value = !!a.set; }
+          }
+        });
+      };
+      currentStage.elements.forEach(el=>{
+        if(!el || !el.props) return;
+        const inter = el.props.interactivity || null;
+        if(!inter) return;
+        const type = (el.constructor && el.constructor.type) || el.type;
+        if(type === 'checkbox' && inter.checkbox && Array.isArray(inter.checkbox.actions)){
+          const chk = el.content && el.content.querySelector
+            ? el.content.querySelector('input[type=checkbox]')
+            : null;
+          if(chk && chk.checked){ applyActions(inter.checkbox.actions); }
+        }else if((type === 'checkboxgroup' || type === 'radiogroup' || type === 'tablecheck') && inter.options){
+          const value = el.getProp && el.getProp('value');
+          const optActions = inter.options[String(value)];
+          if(optActions) applyActions(optActions);
+        }
+      });
+      try{
+        const bar = document.getElementById('indicatorsBar');
+        if(bar){
+          renderIndicators(bar, project);
+          renderFlags(bar, project);
+        }
+      }catch(_e){}
+    }
+    return;
+  }
+
+  // Ensure base maps (id -> default value) are cached on project
+  if(!project.__baseIndicatorsMap){
+    const inds = Array.isArray(project.indicators) ? project.indicators : [];
+    const map = {};
+    for(const ind of inds){
+      if(ind && ind.id){
+        const base = (typeof ind.value === 'number') ? ind.value : 0;
+        map[ind.id] = base;
+      }
+    }
+    project.__baseIndicatorsMap = map;
+  }
+  if(!project.__baseFlagsMap){
+    const fls = Array.isArray(project.flags) ? project.flags : [];
+    const map = {};
+    for(const fl of fls){
+      if(fl && fl.id){
+        const base = !!fl.value;
+        map[fl.id] = base;
+      }
+    }
+    project.__baseFlagsMap = map;
+  }
+
+  // Load all persisted step values
+  let store;
+  try{
+    store = MedelPersistence._load(project) || { steps:{} };
+  }catch(_e){
+    store = { steps:{} };
+  }
+  const stepsStore = store.steps || {};
+
+  // Start from defaults
+  const indicatorsMap = Object.assign({}, project.__baseIndicatorsMap);
+  const flagsMap = Object.assign({}, project.__baseFlagsMap);
+
+  function applyActions(actions){
+    if(!actions) return;
+    for(const a of actions){
+      if(!a || !a.id || !a.type) continue;
+      if(a.type === 'indicator'){
+        const cur = Number.isFinite(indicatorsMap[a.id]) ? indicatorsMap[a.id] : 0;
+        const delta = Number(a.delta || 0);
+        indicatorsMap[a.id] = cur + delta;
+      }else if(a.type === 'flag'){
+        // last write wins
+        flagsMap[a.id] = !!a.set;
+      }
+    }
+  }
+
+  // Build flat step list (only steps, no categories)
+  const flat = buildFlatSteps(project);
+  const flatSteps = Array.isArray(flat.list)
+    ? flat.list.filter(n => n && n.step)
+    : [];
+
+  // Build index of element definitions per step (id -> definition)
+  const stepElementIndex = {};
+  for(let idx = 0; idx < flatSteps.length; idx++){
+    const stepNode = flatSteps[idx];
+    const step = stepNode.step;
+    if(!step || !Array.isArray(step.elements)) continue;
+    const map = {};
+    for(const elDef of step.elements){
+      if(!elDef) continue;
+      const p = elDef.props || {};
+      const id = p.id || p.name || elDef.id || null;
+      if(id){
+        map[String(id)] = elDef;
+      }
+    }
+    stepElementIndex[idx] = map;
+  }
+
+  // Iterate steps in order and apply interactivity according to saved values
+  for(let idx = 0; idx < flatSteps.length; idx++){
+    const stepMap = stepElementIndex[idx];
+    if(!stepMap) continue;
+
+    const rec = Object.prototype.hasOwnProperty.call(stepsStore, idx)
+      ? stepsStore[idx]
+      : stepsStore[String(idx)];
+    if(!rec || !rec.elements) continue;
+    const elementsStore = rec.elements;
+
+    for(const key in elementsStore){
+      if(!Object.prototype.hasOwnProperty.call(elementsStore, key)) continue;
+      const recEl = elementsStore[key];
+      if(!recEl) continue;
+
+      let prefix = '';
+      if(key.startsWith('chk:')) prefix = 'chk:';
+      else if(key.startsWith('cg:')) prefix = 'cg:';
+      else if(key.startsWith('rg:')) prefix = 'rg:';
+      else if(key.startsWith('tbl:')) prefix = 'tbl:';
+      else if(key.startsWith('txt:')) prefix = 'txt:';
+      if(!prefix) continue;
+
+      const id = key.slice(prefix.length);
+      const elDef = stepMap[id];
+      if(!elDef || !elDef.props) continue;
+      const inter = elDef.props.interactivity || null;
+      if(!inter) continue;
+
+      const type = elDef.type || recEl.t || '';
+
+      // Checkbox: apply when checked
+      if(prefix === 'chk:' || type === 'checkbox'){
+        const isChecked = !!(recEl.v === true || recEl.v === 'true' || recEl.v === 1 || recEl.v === '1');
+        if(isChecked && inter.checkbox && Array.isArray(inter.checkbox.actions)){
+          applyActions(inter.checkbox.actions);
+        }
+      }
+      // Checkbox group: v is boolean[]
+      else if(prefix === 'cg:' || type === 'checkboxgroup'){
+        const values = Array.isArray(recEl.v) ? recEl.v : [];
+        const optActions = inter.options || {};
+        for(let i = 0; i < values.length; i++){
+          if(values[i]){
+            const acts = optActions[String(i)];
+            if(acts) applyActions(acts);
+          }
+        }
+      }
+      // Radiogroup: v is selected index
+      else if(prefix === 'rg:' || type === 'radiogroup'){
+        const raw = recEl.v;
+        const sel = (typeof raw === 'number')
+          ? raw
+          : parseInt(raw, 10);
+        if(Number.isFinite(sel) && sel >= 0){
+          const optActions = inter.options || {};
+          const acts = optActions[String(sel)];
+          if(acts) applyActions(acts);
+        }
+      }
+      // Tablecheck: boolean[] for each row/column
+      else if(prefix === 'tbl:' || type === 'tablecheck'){
+        const values = Array.isArray(recEl.v) ? recEl.v : [];
+        const optActions = inter.options || {};
+        for(let i = 0; i < values.length; i++){
+          if(values[i]){
+            const acts = optActions[String(i)];
+            if(acts) applyActions(acts);
+          }
+        }
+      }
+      // Textbox or other types can be extended here if needed
+    }
+  }
+
+  // Write results back to project for rendering
+  if(Array.isArray(project.indicators)){
+    for(const ind of project.indicators){
+      if(ind && ind.id && Object.prototype.hasOwnProperty.call(indicatorsMap, ind.id)){
+        ind.value = indicatorsMap[ind.id];
+      }
+    }
+  }
+  if(Array.isArray(project.flags)){
+    for(const f of project.flags){
+      if(f && f.id && Object.prototype.hasOwnProperty.call(flagsMap, f.id)){
+        f.value = !!flagsMap[f.id];
+      }
+    }
+  }
+
+  // Re-render visual bar
+  try{
+    const bar = document.getElementById('indicatorsBar');
+    if(bar){
+      renderIndicators(bar, project);
+      renderFlags(bar, project);
+    }
+  }catch(_e){}
+}
 
 // ===== MEDEL PERSISTENCE MODULE (v5 — MODEL-BASED, SESSION ONLY) =====
 /* Usa Stage.elements invece del solo DOM scanning.

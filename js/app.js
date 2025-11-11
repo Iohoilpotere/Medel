@@ -10,7 +10,9 @@ import { exportProject } from './export/exporter.js';
 import { ElementsPanel } from './panels/elements-panel.js';
 import { StepsPanel } from './panels/steps-panel.js';
 import { PropertiesPanel } from './panels/properties-panel.js';
+import { InteractivityPanel } from './panels/interactivity-panel.js';
 import { IndicatorsPanel } from './panels/indicators-panel.js';
+import { PresetsPanel } from './panels/presets-panel.js';
 import { IndicatorsStore } from './models/indicators-store.js';
 import { FlagsStore } from './models/flags-store.js';
 import { UpdateStageBgCommand } from './core/commands/update-stage-bg.js';
@@ -60,7 +62,7 @@ export class App{
     const host = $('#stageHost');
     this.stage = new Stage(host, {gridSize:16, aspect:'16:9'});
     this.stage.bus.on('elements-changed', ()=>{ this._captureState(); this.propertiesPanel?.render(); this.stepsPanel?.render(); });
-    this.stage.bus.on('selection-changed', ()=> this.propertiesPanel.render());
+    this.stage.bus.on('selection-changed', ()=> { this.propertiesPanel.render(); this.interactivityPanel?.render(); });
     this.stage.bus.on('interaction', (evt)=>{ this.cmd.execute(new PositionSizeBatchCommand(evt.before, evt.after)); this._renderHistory(); });
     this.cmd.onChange(()=>{ this._captureState(); this._renderHistory(); this.stepsPanel?.render(); });
     this._wireUi();
@@ -69,7 +71,9 @@ export class App{
     this.flags = new FlagsStore(this.project);
     this.indicators = new IndicatorsStore(this.project);
     this.indicatorsPanel = new IndicatorsPanel(this);
+    this.presetsPanel = new PresetsPanel(this);
     this.propertiesPanel = new PropertiesPanel(this);
+    this.interactivityPanel = new InteractivityPanel(this);
     this.cropTool = new CropTool(this);
     this._seedSample();
     this._renderHistory();
@@ -126,8 +130,11 @@ _seedSample(){
       rightTabs.forEach(b=>b.classList.remove('active'));
       rightBodies.forEach(p=>p.classList.remove('active'));
       btn.classList.add('active');
-      const id = btn.dataset.tab==='props' ? '#propsPane' : '#historyPane';
+      let id = '#propsPane';
+      if(btn.dataset.tab==='history') id = '#historyPane';
+      else if(btn.dataset.tab==='interactivity') id = '#interactivityPane';
       document.querySelector(id).classList.add('active');
+      if(id==='#interactivityPane'){ this.interactivityPanel?.render(); }
     }));
 
     const aspectSel = $('#aspectSelect');
@@ -348,5 +355,34 @@ _seedSample(){
     this.stepsPanel.render();
     // if removed current step
     if(JSON.stringify(this.currentStepPath)===JSON.stringify(path)){ this._ensureValidCurrentStep(); }
+  }
+
+
+  addElementFromPreset(data){
+    const Cls = registry.elements.get(data?.type);
+    if(!Cls) throw new Error('Tipo elemento sconosciuto: '+data?.type);
+    const clone = JSON.parse(JSON.stringify(data));
+    const el = Cls.fromJSON(clone);
+    el.name = this._makeName(el.constructor.type);
+    this.cmd.execute(new AddElementCommand(this.stage, el));
+    this.stage.setSelection([el]);
+    this._captureState();
+  }
+
+  addStepFromPreset(stepData, presetName){
+    if(!stepData || stepData.type !== 'step') throw new Error('Preset step non valido');
+    const newStep = JSON.parse(JSON.stringify(stepData));
+    newStep.title = presetName || newStep.title || 'Nuovo step';
+    // Insert after current step path
+    const parent = this._getParentByPath(this.currentStepPath);
+    const arr = (parent.children || parent.steps);
+    if(!Array.isArray(arr)) throw new Error('Struttura steps non valida');
+    const curIdx = this.currentStepPath[this.currentStepPath.length-1] ?? -1;
+    const insertIdx = (curIdx>=0 ? curIdx+1 : arr.length);
+    arr.splice(insertIdx, 0, newStep);
+    // Select it
+    const newPath = this.currentStepPath.slice(0, -1).concat(insertIdx);
+    this.setCurrentStepByPath(newPath);
+    this.stepsPanel.render();
   }
 }
